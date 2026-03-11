@@ -325,6 +325,7 @@ Start here:
 ```bash
 git doctor
 git workflow-help
+git start-day
 git menu
 git dash
 ```
@@ -337,6 +338,12 @@ It now starts with task-oriented entries such as:
 - `Resume existing feature`
 - `Review and commit changes`
 - `Clean up merged work`
+
+If you want one command for the normal start-of-day routine:
+
+```bash
+git start-day
+```
 
 If `fzf`, `lazygit`, or `tmux` are missing:
 
@@ -690,6 +697,12 @@ git ghpr --open
 ### 6. Daily maintenance
 
 At the start of work:
+
+```bash
+git start-day
+```
+
+Or, if you want the pieces separately:
 
 ```bash
 git sync
