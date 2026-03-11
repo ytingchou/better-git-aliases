@@ -280,6 +280,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 ## Usage tutorial
 
 Want a shorter beginner-focused guide? See [docs/day-to-day.md](docs/day-to-day.md).
+For the next planned milestone, see [docs/roadmap-v0.2.0.md](docs/roadmap-v0.2.0.md).
 
 ### 1. Learn the workflow in 30 seconds
 
