@@ -269,6 +269,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git wtrm [query]`: remove a selected worktree
 - `git wtpath [query]`: print a selected worktree path
 - `git wttmux [query]`: open a selected worktree in a tmux session
+- `git wttmux [query] --layout <solo|review|ai-pair|multi-feature>`: open a selected worktree in a chosen tmux layout
 
 ### Tool integration
 
@@ -276,6 +277,8 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git codex [query]`: run `codex` in current or selected worktree
 - `git cline [query]`: run `cline` in current or selected worktree
 - `git cockpit [query]`: create/attach a tmux session with shell + git + AI windows
+- `git cockpit list-layouts`: show available tmux cockpit layouts
+- `git cockpit [query] --layout <solo|review|ai-pair|multi-feature>`: choose a cockpit layout explicitly
 
 ## Usage tutorial
 
@@ -555,6 +558,19 @@ Suggested pattern:
 
 This keeps prompts and local file context isolated by feature.
 
+Available cockpit layouts:
+
+- `solo`: shell + git + optional AI window
+- `review`: shell + git + log + status
+- `ai-pair`: shell + git + AI + notes
+- `multi-feature`: shell + git + worktrees + status + optional AI
+
+Example:
+
+```bash
+git cockpit billing --layout review
+```
+
 ### 5.5 Use tmux as the control plane
 
 For heavier work, prefer tmux over many loose terminal tabs:
@@ -570,6 +586,13 @@ This gives you one place per feature. A practical pattern is:
 - AI window for `codex` or `cline`
 
 If you are mid-review and need to jump elsewhere without losing context, detach tmux and come back later.
+
+If you want a layout specialized for review or multiple active branches:
+
+```bash
+git cockpit billing --layout review
+git cockpit --layout multi-feature
+```
 
 ### 6. Daily maintenance
 

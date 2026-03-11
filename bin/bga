@@ -50,6 +50,10 @@ repo_name() {
   basename "$(repo_root)"
 }
 
+sanitize_name() {
+  printf '%s' "$1" | tr '/[:space:]' '--' | tr -cd '[:alnum:]._-' | sed 's/--*/-/g; s/^-//; s/-$//'
+}
+
 current_branch() {
   git branch --show-current 2>/dev/null || true
 }
@@ -174,34 +178,97 @@ open_ai_cli() {
   (cd "$target" && "$tool")
 }
 
+tmux_attach_or_switch() {
+  local session="$1"
+  if [ -n "${TMUX:-}" ]; then
+    exec tmux switch-client -t "$session"
+  fi
+  exec tmux attach -t "$session"
+}
+
+preferred_ai_tool() {
+  if has codex; then
+    printf 'codex\n'
+  elif has cline; then
+    printf 'cline\n'
+  else
+    return 1
+  fi
+}
+
+cockpit_layout_exists() {
+  case "$1" in
+    solo|review|ai-pair|multi-feature) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+cockpit_session_name() {
+  local target="$1" layout="$2"
+  local repo target_name
+  repo="$(sanitize_name "$(repo_name)")"
+  target_name="$(sanitize_name "$(basename "$target")")"
+  printf 'bga-%s-%s-%s\n' "$repo" "$target_name" "$layout"
+}
+
+create_tmux_window() {
+  local session="$1" target="$2" name="$3" command="$4"
+  tmux new-window -t "$session" -c "$target" -n "$name"
+  [ -n "$command" ] && tmux send-keys -t "$session:$name" "$command" C-m
+}
+
+configure_tmux_layout() {
+  local session="$1" target="$2" layout="$3"
+  local ai_tool=""
+  ai_tool="$(preferred_ai_tool || true)"
+
+  case "$layout" in
+    solo)
+      create_tmux_window "$session" "$target" git "$(has lazygit && printf 'lazygit' || printf 'git status -sb')"
+      if [ -n "$ai_tool" ]; then
+        create_tmux_window "$session" "$target" "$ai_tool" "$ai_tool"
+      fi
+      ;;
+    review)
+      create_tmux_window "$session" "$target" git "$(has lazygit && printf 'lazygit' || printf 'git status -sb')"
+      create_tmux_window "$session" "$target" log "git log --graph --decorate --oneline -n 40"
+      create_tmux_window "$session" "$target" status "git status -sb && printf '\\nRecent branches:\\n' && git branch --sort=-committerdate | head -n 12"
+      ;;
+    ai-pair)
+      create_tmux_window "$session" "$target" git "$(has lazygit && printf 'lazygit' || printf 'git status -sb')"
+      if [ -n "$ai_tool" ]; then
+        create_tmux_window "$session" "$target" "$ai_tool" "$ai_tool"
+      fi
+      create_tmux_window "$session" "$target" notes "printf 'Branch: '; git branch --show-current; printf '\\nNext actions:\\n- inspect diff\\n- ask AI for help\\n- apply and test changes\\n'"
+      ;;
+    multi-feature)
+      create_tmux_window "$session" "$target" git "$(has lazygit && printf 'lazygit' || printf 'git status -sb')"
+      create_tmux_window "$session" "$target" worktrees "git worktree list && printf '\\nRecent branches:\\n' && git branch --sort=-committerdate | head -n 20"
+      create_tmux_window "$session" "$target" status "watch -n 5 'git status -sb; printf \"\\n\"; git branch --show-current'" 
+      if [ -n "$ai_tool" ]; then
+        create_tmux_window "$session" "$target" "$ai_tool" "$ai_tool"
+      fi
+      ;;
+  esac
+}
+
 open_tmux_workspace() {
   local target="${1:-.}"
-  local session="${2:-$(basename "$target")}"
+  local layout="${2:-solo}"
+  local session
   has tmux || die "tmux is not installed"
+  cockpit_layout_exists "$layout" || die "unknown cockpit layout: $layout"
+  session="$(cockpit_session_name "$target" "$layout")"
 
   if tmux has-session -t "$session" 2>/dev/null; then
-    exec tmux attach -t "$session"
+    tmux_attach_or_switch "$session"
   fi
 
-  tmux new-session -d -s "$session" -c "$target" -n editor
-  tmux rename-window -t "$session:editor" 'shell'
-  tmux new-window -t "$session" -c "$target" -n git
-
-  if has lazygit; then
-    tmux send-keys -t "$session:git" 'lazygit' C-m
-  else
-    tmux send-keys -t "$session:git" 'git status -sb' C-m
-  fi
-
-  if has codex; then
-    tmux new-window -t "$session" -c "$target" -n codex
-    tmux send-keys -t "$session:codex" 'codex' C-m
-  elif has cline; then
-    tmux new-window -t "$session" -c "$target" -n cline
-    tmux send-keys -t "$session:cline" 'cline' C-m
-  fi
-
-  exec tmux attach -t "$session"
+  tmux new-session -d -s "$session" -c "$target" -n shell
+  tmux send-keys -t "$session:shell" 'clear' C-m
+  configure_tmux_layout "$session" "$target" "$layout"
+  tmux select-window -t "$session:shell"
+  tmux_attach_or_switch "$session"
 }
 
 cmd_help() {
@@ -229,14 +296,17 @@ Worktree workflow:
   bga worktree add NAME [BASE]  Create a new worktree for a branch
   bga worktree path [QUERY]     Print selected worktree path
   bga worktree remove [QUERY]   Remove a worktree
-  bga worktree tmux [QUERY]     Open selected worktree in tmux
+  bga worktree tmux [QUERY] [--layout LAYOUT]
+                                Open selected worktree in tmux
   bga worktree lazygit [QUERY]  Open selected worktree in lazygit
 
 Tool integrations:
   bga lazygit [QUERY]           Open current or chosen worktree in lazygit
   bga codex [QUERY]             Run codex in current or chosen worktree
   bga cline [QUERY]             Run cline in current or chosen worktree
-  bga cockpit [QUERY]           Open tmux session with git + AI panes
+  bga cockpit [QUERY] [--layout LAYOUT]
+                                Open tmux cockpit for a worktree
+  bga cockpit list-layouts      Show available cockpit layouts
 
 Shell integration:
   bga init bash
@@ -522,10 +592,23 @@ cmd_worktree_remove() {
 }
 
 cmd_worktree_tmux() {
-  local target
-  target="$(resolve_worktree_path "${1:-}")"
+  local target_query="" target layout="solo"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --layout)
+        shift
+        [ -n "${1:-}" ] || die "usage: bga worktree tmux [QUERY] [--layout LAYOUT]"
+        layout="$1"
+        ;;
+      *)
+        target_query="$1"
+        ;;
+    esac
+    shift || true
+  done
+  target="$(resolve_worktree_path "$target_query")"
   [ -n "${target:-}" ] || exit 0
-  open_tmux_workspace "$target" "$(basename "$target")"
+  open_tmux_workspace "$target" "$layout"
 }
 
 cmd_worktree_lazygit() {
@@ -556,9 +639,25 @@ cmd_cline() {
 }
 
 cmd_cockpit() {
-  local target="."
-  [ $# -gt 0 ] && target="$(resolve_worktree_path "$1")"
-  open_tmux_workspace "$target" "git-$(basename "$target")"
+  local target="." layout="solo"
+  if [ "${1:-}" = "list-layouts" ]; then
+    printf 'solo\nreview\nai-pair\nmulti-feature\n'
+    return 0
+  fi
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --layout)
+        shift
+        [ -n "${1:-}" ] || die "usage: bga cockpit [QUERY] [--layout LAYOUT]"
+        layout="$1"
+        ;;
+      *)
+        target="$(resolve_worktree_path "$1")"
+        ;;
+    esac
+    shift || true
+  done
+  open_tmux_workspace "$target" "$layout"
 }
 
 cmd_init() {
@@ -707,6 +806,12 @@ Typical windows:
 - shell
 - git/lazygit
 - codex or cline
+
+Layouts:
+- solo
+- review
+- ai-pair
+- multi-feature
 EOF
       ;;
     "Prune merged branches")
