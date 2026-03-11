@@ -512,6 +512,7 @@ Feature workflow:
   bga feature start NAME [BASE] Create branch + worktree
   bga feature resume [QUERY] [--print|--lazygit|--cockpit]
                                 Resume a feature worktree
+  bga feature pause            Show a handoff summary for the current feature
   bga feature ship              Status checklist before push/merge
   bga feature submit [BASE]     Show ship summary, then publish the branch
   bga feature cleanup [BRANCH] [--base BASE] [--apply]
@@ -886,6 +887,46 @@ cmd_feature_resume() {
     cockpit) open_tmux_workspace "$target" "solo" ;;
     *) die "unknown feature resume action: $action" ;;
   esac
+}
+
+cmd_feature_pause() {
+  ensure_repo
+  local branch root counts parsed ahead behind resume_query
+  root="$(repo_root)"
+  branch="$(current_branch)"
+  resume_query="${branch#feature/}"
+  [ -n "$resume_query" ] || resume_query="$branch"
+  printf 'Feature pause summary\n\n'
+  printf 'repo:    %s\n' "$root"
+  printf 'branch:  %s\n' "${branch:-detached}"
+  printf 'base:    %s\n' "$(default_base_branch)"
+  case "${branch:-}" in
+    feature/*) ;;
+    *)
+      printf 'note:    current branch does not use feature/* naming\n'
+      ;;
+  esac
+  printf '\nstatus:\n'
+  git status -sb
+  printf '\nrecent commits:\n'
+  git log --oneline -n 5
+  printf '\nupstream:\n'
+  counts="$(branch_ahead_behind "${branch:-HEAD}" || true)"
+  if [ -n "$counts" ]; then
+    parsed="$(parse_ahead_behind "$counts")"
+    ahead="${parsed%% *}"
+    behind="${parsed##* }"
+    printf '  ahead %s / behind %s\n' "${ahead:-0}" "${behind:-0}"
+  else
+    printf '  no upstream\n'
+  fi
+  printf '\nresume commands:\n'
+  printf '  git feature resume %s --lazygit\n' "$resume_query"
+  printf '  git feature resume %s --cockpit\n' "$resume_query"
+  printf '\nnext-step note:\n'
+  printf '  branch=%s\n' "${branch:-detached}"
+  printf '  todo=describe the next concrete change before you stop\n'
+  printf '  blocker=record any open blocker or dependency\n'
 }
 
 cmd_feature_ship() {
@@ -1439,6 +1480,7 @@ run_menu_action() {
     "Start the workday") cmd_start_day ;;
     "Start a new feature") menu_prompt_feature_start ;;
     "Resume existing feature") menu_prompt_resume_feature ;;
+    "Pause current feature") cmd_feature_pause ;;
     "Review and commit changes") menu_review_and_commit ;;
     "Submit current feature for review") cmd_feature_submit ;;
     "Clean up current feature after merge") cmd_feature_cleanup ;;
@@ -1562,6 +1604,16 @@ Options:
 - print the path
 - open lazygit
 - open tmux cockpit
+EOF
+      ;;
+    "Pause current feature")
+      cat <<'EOF'
+Show a structured handoff summary for the current feature.
+
+Useful before:
+- stopping for the day
+- switching to another task
+- handing work to someone else
 EOF
       ;;
     "Review and commit changes")
@@ -1707,7 +1759,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start the workday\nStart a new feature\nResume existing feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
+  items=$'Start the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \
@@ -1747,11 +1799,12 @@ main() {
       case "${1:-}" in
         start) shift; cmd_feature_start "$@" ;;
         resume) shift; cmd_feature_resume "$@" ;;
+        pause) shift; cmd_feature_pause "$@" ;;
         ship) shift; cmd_feature_ship "$@" ;;
         submit) shift; cmd_feature_submit "$@" ;;
         cleanup) shift; cmd_feature_cleanup "$@" ;;
         finish) shift; cmd_feature_finish "$@" ;;
-        *) die "usage: bga feature <start|resume|ship|submit|cleanup|finish> ..." ;;
+        *) die "usage: bga feature <start|resume|pause|ship|submit|cleanup|finish> ..." ;;
       esac
       ;;
     worktree|wt)

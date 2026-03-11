@@ -284,6 +284,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 
 - `git feature start <name> [base]`: create `feature/<name>` and a dedicated worktree
 - `git feature resume [query] [--print|--lazygit|--cockpit]`: resume a feature worktree
+- `git feature pause`: show a structured handoff summary for the current feature
 - `git feature ship`: quick pre-push checklist for the current branch
 - `git feature submit [base]`: show ship summary, then publish the branch
 - `git feature cleanup [branch] [--base base] [--apply]`: preview or clean up a merged feature branch
@@ -396,6 +397,20 @@ If you come back later and want to resume with more context:
 git feature resume login-page --lazygit
 git feature resume login-page --cockpit
 ```
+
+Before you stop for the day or switch context:
+
+```bash
+git feature pause
+```
+
+That gives you:
+
+- current branch and status
+- recent commits
+- upstream state
+- suggested resume commands
+- a simple handoff note template
 
 ### 3. Work on multiple features at once
 
