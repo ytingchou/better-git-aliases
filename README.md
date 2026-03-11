@@ -179,6 +179,15 @@ And adds the include file to your global Git config.
 
 If `~/.local/bin` is not in your `PATH`, add it in your shell config.
 
+You can also store a few defaults without editing scripts:
+
+```bash
+git config-bga set base_branch main
+git config-bga set remote origin
+git config-bga set cockpit_layout review
+git config-bga list
+```
+
 ## Uninstall
 
 ```bash
@@ -316,6 +325,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git cockpit [query]`: create/attach a tmux session with shell + git + AI windows
 - `git cockpit list-layouts`: show available tmux cockpit layouts
 - `git cockpit [query] --layout <solo|review|ai-pair|multi-feature>`: choose a cockpit layout explicitly
+- `git config-bga get|set|list`: manage simple defaults such as `base_branch`, `remote`, and `cockpit_layout`
 
 ## Usage tutorial
 

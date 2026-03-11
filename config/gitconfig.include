@@ -1,4 +1,5 @@
 [alias]
+  config-bga = "!f() { \"$HOME/.local/bin/bga\" config \"$@\"; }; f"
   doctor = "!\"$HOME/.local/bin/bga\" doctor"
   bootstrap = "!f() { \"$HOME/.local/bin/bga\" bootstrap \"$@\"; }; f"
   lazygit-config = "!f() { \"$HOME/.local/bin/bga\" lazygit-config \"$@\"; }; f"

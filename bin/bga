@@ -12,6 +12,35 @@ config_home() {
   printf '%s/.config/better-git-aliases\n' "${HOME}"
 }
 
+config_file_path() {
+  printf '%s/config.env\n' "$(config_home)"
+}
+
+ensure_config_home() {
+  mkdir -p "$(config_home)"
+}
+
+config_get() {
+  local key="$1"
+  [ -f "$(config_file_path)" ] || return 1
+  awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, "", $0); print; found=1 } END { exit found ? 0 : 1 }' "$(config_file_path)"
+}
+
+config_set() {
+  local key="$1" value="$2" tmp
+  ensure_config_home
+  tmp="$(mktemp)"
+  if [ -f "$(config_file_path)" ]; then
+    awk -F= -v key="$key" '$1 != key { print }' "$(config_file_path)" >"$tmp"
+  fi
+  printf '%s=%s\n' "$key" "$value" >>"$tmp"
+  mv "$tmp" "$(config_file_path)"
+}
+
+config_list() {
+  [ -f "$(config_file_path)" ] && cat "$(config_file_path)"
+}
+
 asset_path() {
   local rel="$1"
   if [ -f "${BGA_ROOT}/${rel}" ]; then
@@ -107,6 +136,12 @@ current_branch() {
 }
 
 default_base_branch() {
+  local configured
+  configured="$(config_get base_branch || true)"
+  if [ -n "$configured" ]; then
+    printf '%s\n' "$configured"
+    return 0
+  fi
   if git show-ref --verify --quiet refs/heads/main; then
     printf 'main\n'
   elif git show-ref --verify --quiet refs/heads/master; then
@@ -375,7 +410,7 @@ open_url() {
 }
 
 github_https_remote_url() {
-  local remote="${1:-origin}" url host path
+  local remote="${1:-$(config_get remote || printf 'origin')}" url host path
   url="$(git remote get-url "$remote" 2>/dev/null || true)"
   [ -n "$url" ] || die "git remote '$remote' not found"
   case "$url" in
@@ -498,6 +533,7 @@ better-git-aliases
 Core:
   bga help                      Show this help
   bga doctor                    Check environment and dependencies
+  bga config <get|set|list>     Manage simple better-git-aliases config
   bga bootstrap [brew|apt]      Install recommended dependencies
   bga lazygit-config <subcmd>   Manage curated lazygit config
   bga menu                      Show interactive workflow menu
@@ -556,6 +592,7 @@ Shell integration:
 
 Recommended git aliases after install:
   git doctor
+  git config-bga
   git bootstrap
   git lazygit-config
   git start-day
@@ -654,6 +691,17 @@ cmd_doctor() {
     printf '  [miss] lazygit template not found\n'
   fi
 
+  printf '\nconfig:\n'
+  if [ -f "$(config_file_path)" ]; then
+    printf '  [ok]   %s\n' "$(config_file_path)"
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      printf '         %s\n' "$line"
+    done < "$(config_file_path)"
+  else
+    printf '  [info] no user config yet\n'
+  fi
+
   printf '\nnext steps:\n'
   if ! has fzf || ! has tmux || ! has lazygit || ! path_has_dir "${HOME}/.local/bin"; then
     printf '  - run: git bootstrap\n'
@@ -695,6 +743,32 @@ cmd_bootstrap() {
       ;;
     *)
       die "supported package managers: brew, apt"
+      ;;
+  esac
+}
+
+cmd_config() {
+  local action="${1:-list}" key value
+  shift || true
+  case "$action" in
+    get)
+      key="${1:-}"
+      [ -n "$key" ] || die "usage: bga config get <key>"
+      config_get "$key"
+      ;;
+    set)
+      key="${1:-}"
+      value="${2:-}"
+      [ -n "$key" ] || die "usage: bga config set <key> <value>"
+      [ -n "$value" ] || die "usage: bga config set <key> <value>"
+      config_set "$key" "$value"
+      printf '%s=%s\n' "$key" "$value"
+      ;;
+    list)
+      config_list
+      ;;
+    *)
+      die "usage: bga config <get|set|list> ..."
       ;;
   esac
 }
@@ -1409,7 +1483,9 @@ cmd_github_pr() {
 }
 
 cmd_cockpit() {
-  local target="." layout="solo"
+  local target="." layout=""
+  layout="$(config_get cockpit_layout || true)"
+  [ -n "$layout" ] || layout="solo"
   if [ "${1:-}" = "list-layouts" ]; then
     printf 'solo\nreview\nai-pair\nmulti-feature\n'
     return 0
@@ -1529,6 +1605,7 @@ run_menu_action() {
     "Clean up current feature after merge") cmd_feature_cleanup ;;
     "Clean up merged work") menu_cleanup_merged_work ;;
     "Doctor") cmd_doctor ;;
+    "Configure defaults") cmd_config list ;;
     "Bootstrap dependencies") cmd_bootstrap ;;
     "Install lazygit config") cmd_lazygit_config install ;;
     "Dashboard") cmd_dashboard ;;
@@ -1555,6 +1632,14 @@ Shows:
 - recommended tools
 - git include installation
 - shell helper status
+EOF
+      ;;
+    "Configure defaults")
+      cat <<'EOF'
+Inspect or change stored defaults such as:
+- base_branch
+- remote
+- cockpit_layout
 EOF
       ;;
     "Start the workday")
@@ -1811,7 +1896,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start the workday\nFinish the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
+  items=$'Start the workday\nFinish the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nDoctor\nConfigure defaults\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \
@@ -1838,6 +1923,7 @@ main() {
     __menu-preview) menu_preview "${1:-}" ;;
     help|-h|--help) cmd_help ;;
     doctor) cmd_doctor ;;
+    config) cmd_config "$@" ;;
     bootstrap) cmd_bootstrap "$@" ;;
     lazygit-config) cmd_lazygit_config "$@" ;;
     start-day) cmd_start_day "$@" ;;
