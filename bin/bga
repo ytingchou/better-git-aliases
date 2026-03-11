@@ -530,6 +530,7 @@ Tool integrations:
   bga codex [QUERY]             Run codex in current or chosen worktree
   bga cline [QUERY]             Run cline in current or chosen worktree
   bga github repo [--open]      Print or open the GitHub repo URL
+  bga github status [BASE]      Show branch publish and review context
   bga github compare [BASE] [--open]
                                 Print or open the compare URL for current branch
   bga github pr [BASE] [--open] Print or open the new PR URL for current branch
@@ -1085,6 +1086,35 @@ cmd_github_repo() {
   fi
 }
 
+cmd_github_status() {
+  ensure_repo
+  local base="" branch repo_url compare_url pr_url upstream counts parsed ahead behind
+  branch="$(current_branch)"
+  [ -n "$branch" ] || die "detached HEAD; checkout a branch first"
+  [ -n "${1:-}" ] && base="$1" || base="$(default_base_branch)"
+  repo_url="$(github_https_remote_url origin)"
+  compare_url="${repo_url}/compare/${base}...${branch}?expand=1"
+  pr_url="${repo_url}/compare/${base}...${branch}?expand=1&template=pull_request_template.md"
+  upstream="$(branch_upstream "$branch")"
+
+  printf 'repo:     %s\n' "$repo_url"
+  printf 'branch:   %s\n' "$branch"
+  printf 'base:     %s\n' "$base"
+  if [ -n "$upstream" ]; then
+    counts="$(branch_ahead_behind "$branch" || true)"
+    parsed="$(parse_ahead_behind "$counts")"
+    ahead="${parsed%% *}"
+    behind="${parsed##* }"
+    printf 'upstream: %s\n' "$upstream"
+    printf 'publish:  yes (ahead %s / behind %s)\n' "${ahead:-0}" "${behind:-0}"
+  else
+    printf 'upstream: none\n'
+    printf 'publish:  no\n'
+  fi
+  printf 'compare:  %s\n' "$compare_url"
+  printf 'pr:       %s\n' "$pr_url"
+}
+
 cmd_github_compare() {
   ensure_repo
   local base="" open_flag=0 branch url repo_url
@@ -1244,6 +1274,7 @@ run_menu_action() {
     "Resume existing feature") menu_prompt_resume_feature ;;
     "Review and commit changes") menu_review_and_commit ;;
     "Clean up merged work") menu_cleanup_merged_work ;;
+    "Show GitHub status for current branch") cmd_github_status ;;
     "Open GitHub compare for current branch") cmd_github_compare --open ;;
     "Open GitHub PR page for current branch") cmd_github_pr --open ;;
     "Doctor") cmd_doctor ;;
@@ -1283,6 +1314,18 @@ Useful before:
 - creating a PR
 - checking the final diff
 - sharing a review URL
+EOF
+      ;;
+    "Show GitHub status for current branch")
+      cat <<'EOF'
+Show publish/review context for the current branch.
+
+Includes:
+- repo URL
+- branch and base
+- upstream/publish state
+- compare URL
+- PR URL
 EOF
       ;;
     "Open GitHub PR page for current branch")
@@ -1456,7 +1499,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nClean up merged work\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nHelp'
+  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nClean up merged work\nShow GitHub status for current branch\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \
@@ -1518,9 +1561,10 @@ main() {
     github)
       case "${1:-}" in
         repo) shift; cmd_github_repo "$@" ;;
+        status) shift; cmd_github_status "$@" ;;
         compare) shift; cmd_github_compare "$@" ;;
         pr) shift; cmd_github_pr "$@" ;;
-        *) die "usage: bga github <repo|compare|pr> [--open]" ;;
+        *) die "usage: bga github <repo|status|compare|pr> [--open]" ;;
       esac
       ;;
     cockpit) cmd_cockpit "$@" ;;

@@ -19,6 +19,7 @@
   codex = "!f() { \"$HOME/.local/bin/bga\" codex \"$@\"; }; f"
   cline = "!f() { \"$HOME/.local/bin/bga\" cline \"$@\"; }; f"
   ghrepo = "!f() { \"$HOME/.local/bin/bga\" github repo \"$@\"; }; f"
+  ghstatus = "!f() { \"$HOME/.local/bin/bga\" github status \"$@\"; }; f"
   ghcompare = "!f() { \"$HOME/.local/bin/bga\" github compare \"$@\"; }; f"
   ghpr = "!f() { \"$HOME/.local/bin/bga\" github pr \"$@\"; }; f"
   cockpit = "!f() { \"$HOME/.local/bin/bga\" cockpit \"$@\"; }; f"

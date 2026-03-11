@@ -302,6 +302,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git codex [query]`: run `codex` in current or selected worktree
 - `git cline [query]`: run `cline` in current or selected worktree
 - `git ghrepo [--open]`: print or open the GitHub repo URL
+- `git ghstatus [base]`: show branch publish state plus compare/PR URLs
 - `git ghcompare [base] [--open]`: print or open the compare URL for the current branch
 - `git ghpr [base] [--open]`: print or open the new PR URL for the current branch
 - `git cockpit [query]`: create/attach a tmux session with shell + git + AI windows
@@ -617,6 +618,7 @@ GitHub helpers for the current branch:
 
 ```bash
 git ghrepo
+git ghstatus
 git ghcompare
 git ghpr --open
 ```
@@ -647,6 +649,7 @@ git cockpit --layout multi-feature
 If you are about to open a PR, these are the most useful shortcuts:
 
 ```bash
+git ghstatus
 git ghcompare
 git ghpr --open
 ```
