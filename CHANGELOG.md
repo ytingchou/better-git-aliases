@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.2.0] - 2026-03-11
+
+### Added
+
+- Cockpit tmux layouts: `solo`, `review`, `ai-pair`, and `multi-feature`
+- `bga cockpit list-layouts` and explicit layout selection for `cockpit` and `worktree tmux`
+- Lazygit config management helpers:
+  - `lazygit-config diff`
+  - `lazygit-config backup`
+  - `lazygit-config merge-hint`
+- Worktree lifecycle helpers:
+  - `feature finish`
+  - `worktree stale`
+  - `worktree clean`
+
+### Changed
+
+- Improved `doctor` diagnostics with PATH checks, shell helper guidance, interactive feature readiness, and actionable next steps
+- `feature start` and `worktree add` now print clean path-only output for scripting use
+- Expanded README guidance for tmux cockpit layouts, cleanup flows, and lazygit config management
+
 ## [0.1.1] - 2026-03-11
 
 ### Added
