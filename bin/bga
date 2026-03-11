@@ -511,6 +511,8 @@ Feature workflow:
   bga feature start NAME [BASE] Create branch + worktree
   bga feature ship              Status checklist before push/merge
   bga feature submit [BASE]     Show ship summary, then publish the branch
+  bga feature cleanup [BRANCH] [--base BASE] [--apply]
+                                Preview or clean up a merged feature branch
   bga feature finish [BRANCH] [--base BASE]
                                 Clean up merged feature branch + worktree
 
@@ -818,13 +820,14 @@ cmd_prune_merged() {
   local protected current
   current="$(current_branch)"
   protected="main|master|develop|dev|${current}"
-  git branch --merged \
-    | sed 's/^[* ]*//' \
-    | grep -Ev "^(${protected})$" \
-    | awk 'NF' \
-    | while read -r branch; do
-        git branch -d "$branch"
-      done
+  while read -r branch; do
+    [ -n "$branch" ] || continue
+    git branch -d "$branch"
+  done < <(
+    git branch --merged \
+      | sed 's/^[* ]*//' \
+      | grep -Ev "^(${protected})$" || true
+  )
 }
 
 cmd_feature_start() {
@@ -936,6 +939,69 @@ cmd_feature_finish() {
   fi
 
   [ "$deleted_branch" -eq 1 ] || true
+}
+
+cmd_feature_cleanup() {
+  ensure_repo
+  local branch="" base="" apply=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --base)
+        shift
+        [ -n "${1:-}" ] || die "usage: bga feature cleanup [BRANCH] [--base BASE] [--apply]"
+        base="$1"
+        ;;
+      --apply)
+        apply=1
+        ;;
+      *)
+        branch="$1"
+        ;;
+    esac
+    shift || true
+  done
+  [ -n "$branch" ] || branch="$(current_branch)"
+  [ -n "$branch" ] || die "usage: bga feature cleanup [BRANCH] [--base BASE] [--apply]"
+  [ -n "$base" ] || base="$(default_base_branch)"
+
+  printf 'Feature cleanup:\n'
+  printf '  branch: %s\n' "$branch"
+  printf '  base:   %s\n' "$base"
+
+  if branch_is_merged_into "$branch" "$base"; then
+    printf '  merged: yes\n'
+  else
+    printf '  merged: no\n'
+    die "branch '$branch' is not merged into '$base'"
+  fi
+
+  printf '\nWorktrees for branch:\n'
+  if branch_worktrees "$branch" | grep . >/dev/null 2>&1; then
+    branch_worktrees "$branch" | column -t -s '|'
+  else
+    printf '  none\n'
+  fi
+
+  printf '\nStale managed worktrees:\n'
+  cmd_worktree_stale "$base"
+
+  printf '\nMerged branch cleanup preview:\n'
+  git branch --merged \
+    | sed 's/^[* ]*//' \
+    | grep -Ev "^(main|master|develop|dev|${branch})$" \
+    | awk 'NF { print "  " $0 }' || true
+
+  if [ "$apply" -eq 0 ]; then
+    printf '\nDry run. Re-run with --apply to perform cleanup.\n'
+    return 0
+  fi
+
+  printf '\nApplying cleanup:\n'
+  cmd_feature_finish "$branch" --base "$base"
+  printf '\nCleaning stale managed worktrees:\n'
+  cmd_worktree_clean "$base" --apply
+  printf '\nPruning merged local branches:\n'
+  cmd_prune_merged
 }
 
 cmd_worktree_list() {
@@ -1338,6 +1404,7 @@ run_menu_action() {
     "Resume existing feature") menu_prompt_resume_feature ;;
     "Review and commit changes") menu_review_and_commit ;;
     "Submit current feature for review") cmd_feature_submit ;;
+    "Clean up current feature after merge") cmd_feature_cleanup ;;
     "Clean up merged work") menu_cleanup_merged_work ;;
     "Doctor") cmd_doctor ;;
     "Bootstrap dependencies") cmd_bootstrap ;;
@@ -1387,6 +1454,17 @@ Good when:
 - local work is ready for review
 - you want one command from final check to published branch
 - your team opens PRs/MRs directly in the web UI
+EOF
+      ;;
+    "Clean up current feature after merge")
+      cat <<'EOF'
+Preview cleanup for the current feature branch after merge.
+
+Behavior:
+- checks whether the branch is merged into the base branch
+- shows related worktrees
+- previews stale worktree and merged branch cleanup
+- requires --apply in CLI usage for destructive cleanup
 EOF
       ;;
     "Show GitHub status for current branch")
@@ -1582,7 +1660,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nSubmit current feature for review\nClean up merged work\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
+  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \
@@ -1622,8 +1700,9 @@ main() {
         start) shift; cmd_feature_start "$@" ;;
         ship) shift; cmd_feature_ship "$@" ;;
         submit) shift; cmd_feature_submit "$@" ;;
+        cleanup) shift; cmd_feature_cleanup "$@" ;;
         finish) shift; cmd_feature_finish "$@" ;;
-        *) die "usage: bga feature <start|ship|submit|finish> ..." ;;
+        *) die "usage: bga feature <start|ship|submit|cleanup|finish> ..." ;;
       esac
       ;;
     worktree|wt)

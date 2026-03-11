@@ -284,6 +284,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git feature start <name> [base]`: create `feature/<name>` and a dedicated worktree
 - `git feature ship`: quick pre-push checklist for the current branch
 - `git feature submit [base]`: show ship summary, then publish the branch
+- `git feature cleanup [branch] [--base base] [--apply]`: preview or clean up a merged feature branch
 - `git feature finish [branch] [--base base]`: remove merged managed worktrees and try to delete the local branch
 
 ### Worktree workflow
@@ -615,6 +616,19 @@ That flow:
 - shows the `feature ship` summary
 - publishes the branch if needed
 - tells you to open your Git hosting web UI and create the PR/MR there
+
+After the branch is merged:
+
+```bash
+git feature cleanup
+git feature cleanup --apply
+```
+
+That flow:
+
+- checks whether the feature is merged into the base branch
+- previews related worktrees and stale cleanup
+- on `--apply`, runs branch/worktree cleanup
 
 Available cockpit layouts:
 
