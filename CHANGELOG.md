@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.3.0] - 2026-03-12
+
+### Added
+
+- Daily workflow commands:
+  - `start-day`
+  - `feature resume`
+  - `feature cleanup`
+- Task-oriented menu actions for:
+  - start workday
+  - submit current feature for review
+  - clean up current feature after merge
+- Shell helper `fresume`
+- Ongoing roadmap document under `docs/roadmap-next.md`
+
+### Changed
+
+- `feature submit` is now platform-agnostic and only performs ship + publish + next-step guidance
+- Main workflow is now more Git-native, with GitHub-specific helpers treated as optional
+- Dashboard shows stronger attention signals for dirty worktrees, stale worktrees, and upstream state
+- GitHub helper set now includes status, publish, and submit helpers for optional GitHub-based workflows
+
 ## [0.2.0] - 2026-03-11
 
 ### Added
