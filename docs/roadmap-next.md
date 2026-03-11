@@ -91,24 +91,26 @@ Why it mattered:
 
 - current defaults are good, but teams eventually want their own conventions
 
-## Next
 ### 6. Team conventions
 
 Goal:
 
 - let a repo or team share a few workflow defaults without everyone hand-tuning local config
 
-Possible additions:
+Delivered:
 
-- repo-level `.bga.env` or `.bga.config`
+- repo-level `.bga.env`
 - default base branch
 - preferred remote
 - preferred cockpit layout
-- optional protected branch list
+- workspace root override
+- local user override still wins
 
-Why:
+Why it mattered:
 
 - local config is useful, but team conventions should not depend on tribal knowledge
+
+## Next
 
 ### 7. Workspace action menu
 

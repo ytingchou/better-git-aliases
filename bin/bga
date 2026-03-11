@@ -12,8 +12,25 @@ config_home() {
   printf '%s/.config/better-git-aliases\n' "${HOME}"
 }
 
-config_file_path() {
+user_config_file_path() {
   printf '%s/config.env\n' "$(config_home)"
+}
+
+repo_config_file_path() {
+  local root
+  root="$(repo_root 2>/dev/null || true)"
+  [ -n "$root" ] || return 1
+  printf '%s/.bga.env\n' "$root"
+}
+
+config_file_path() {
+  user_config_file_path
+}
+
+config_value_from_file() {
+  local file="$1" key="$2"
+  [ -f "$file" ] || return 1
+  awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, "", $0); print; found=1 } END { exit found ? 0 : 1 }' "$file"
 }
 
 ensure_config_home() {
@@ -22,23 +39,58 @@ ensure_config_home() {
 
 config_get() {
   local key="$1"
-  [ -f "$(config_file_path)" ] || return 1
-  awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, "", $0); print; found=1 } END { exit found ? 0 : 1 }' "$(config_file_path)"
+  config_value_from_file "$(user_config_file_path)" "$key" && return 0
+  config_value_from_file "$(repo_config_file_path)" "$key" && return 0
+  return 1
 }
 
 config_set() {
   local key="$1" value="$2" tmp
   ensure_config_home
   tmp="$(mktemp)"
-  if [ -f "$(config_file_path)" ]; then
-    awk -F= -v key="$key" '$1 != key { print }' "$(config_file_path)" >"$tmp"
+  if [ -f "$(user_config_file_path)" ]; then
+    awk -F= -v key="$key" '$1 != key { print }' "$(user_config_file_path)" >"$tmp"
   fi
   printf '%s=%s\n' "$key" "$value" >>"$tmp"
-  mv "$tmp" "$(config_file_path)"
+  mv "$tmp" "$(user_config_file_path)"
 }
 
 config_list() {
-  [ -f "$(config_file_path)" ] && cat "$(config_file_path)"
+  local repo_file user_file found=0 line key value effective
+  repo_file="$(repo_config_file_path || true)"
+  user_file="$(user_config_file_path)"
+  if [ -n "$repo_file" ] && [ -f "$repo_file" ]; then
+    printf 'repo defaults (%s):\n' "$repo_file"
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      printf '  %s\n' "$line"
+      found=1
+    done < "$repo_file"
+    printf '\n'
+  fi
+  if [ -f "$user_file" ]; then
+    printf 'user overrides (%s):\n' "$user_file"
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      printf '  %s\n' "$line"
+      found=1
+    done < "$user_file"
+    printf '\n'
+  fi
+  printf 'effective values:\n'
+  while IFS= read -r key; do
+    [ -n "$key" ] || continue
+    effective="$(config_get "$key" || true)"
+    [ -n "$effective" ] || continue
+    printf '  %s=%s\n' "$key" "$effective"
+    found=1
+  done <<'EOF'
+base_branch
+remote
+cockpit_layout
+workspace_root
+EOF
+  [ "$found" -eq 1 ] || printf '  (none)\n'
 }
 
 asset_path() {
@@ -758,15 +810,26 @@ cmd_doctor() {
   fi
 
   printf '\nconfig:\n'
-  if [ -f "$(config_file_path)" ]; then
-    printf '  [ok]   %s\n' "$(config_file_path)"
-    while IFS= read -r line; do
-      [ -n "$line" ] || continue
-      printf '         %s\n' "$line"
-    done < "$(config_file_path)"
+  if [ -f "$(user_config_file_path)" ]; then
+    printf '  [ok]   user overrides: %s\n' "$(user_config_file_path)"
   else
-    printf '  [info] no user config yet\n'
+    printf '  [info] no user overrides yet\n'
   fi
+  if [ -f "$(repo_config_file_path || true)" ]; then
+    printf '  [ok]   repo defaults: %s\n' "$(repo_config_file_path)"
+  else
+    printf '  [info] no repo defaults file (.bga.env) in this repo\n'
+  fi
+  while IFS= read -r key; do
+    local_value="$(config_get "$key" || true)"
+    [ -n "$local_value" ] || continue
+    printf '         %s=%s\n' "$key" "$local_value"
+  done <<'EOF'
+base_branch
+remote
+cockpit_layout
+workspace_root
+EOF
 
   printf '\nnext steps:\n'
   if ! has fzf || ! has tmux || ! has lazygit || ! path_has_dir "${HOME}/.local/bin"; then
@@ -1769,10 +1832,16 @@ EOF
       ;;
     "Configure defaults")
       cat <<'EOF'
-Inspect or change stored defaults such as:
+Inspect or change defaults such as:
 - base_branch
 - remote
 - cockpit_layout
+- workspace_root
+
+Resolution order:
+- user overrides from config-bga
+- repo defaults from .bga.env
+- built-in defaults
 EOF
       ;;
     "Start the workday")

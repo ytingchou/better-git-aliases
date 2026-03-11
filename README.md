@@ -189,6 +189,14 @@ git config-bga set workspace_root ~/src
 git config-bga list
 ```
 
+If your team wants shared defaults inside one repo, copy [.bga.env.example](.bga.env.example) to `.bga.env` in the repo root and commit it.
+
+Resolution order is:
+
+- user overrides from `git config-bga set ...`
+- repo defaults from `.bga.env`
+- built-in defaults
+
 ## Uninstall
 
 ```bash
@@ -332,7 +340,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git cockpit [query]`: create/attach a tmux session with shell + git + AI windows
 - `git cockpit list-layouts`: show available tmux cockpit layouts
 - `git cockpit [query] --layout <solo|review|ai-pair|multi-feature>`: choose a cockpit layout explicitly
-- `git config-bga get|set|list`: manage simple defaults such as `base_branch`, `remote`, `cockpit_layout`, and `workspace_root`
+- `git config-bga get|set|list`: manage personal overrides such as `base_branch`, `remote`, `cockpit_layout`, and `workspace_root`
 
 ## Usage tutorial
 
@@ -784,6 +792,12 @@ If your repos live under a fixed root, store it once:
 
 ```bash
 git config-bga set workspace_root ~/src
+```
+
+If your whole team uses the same base branch or preferred cockpit layout in one repo, commit a `.bga.env` file:
+
+```bash
+cp .bga.env.example .bga.env
 ```
 
 At the end of work:
