@@ -36,6 +36,13 @@ gdoctor() {
   "$(_bga_repo_bin)" doctor "$@"
 }
 
+fresume() {
+  local target
+  target="$("$(_bga_repo_bin)" feature resume "${1:-}" --print)" || return $?
+  [ -n "$target" ] || return 0
+  cd "$target" || return $?
+}
+
 gcodex() {
   local target="."
   if [ $# -gt 0 ]; then

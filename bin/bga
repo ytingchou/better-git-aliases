@@ -510,6 +510,8 @@ Core:
 
 Feature workflow:
   bga feature start NAME [BASE] Create branch + worktree
+  bga feature resume [QUERY] [--print|--lazygit|--cockpit]
+                                Resume a feature worktree
   bga feature ship              Status checklist before push/merge
   bga feature submit [BASE]     Show ship summary, then publish the branch
   bga feature cleanup [BRANCH] [--base BASE] [--apply]
@@ -862,6 +864,28 @@ cmd_feature_start() {
   fi
 
   printf '%s\n' "$target_path"
+}
+
+cmd_feature_resume() {
+  ensure_repo
+  local query="" action="print" target
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --print) action="print" ;;
+      --lazygit) action="lazygit" ;;
+      --cockpit) action="cockpit" ;;
+      *) query="$1" ;;
+    esac
+    shift || true
+  done
+  target="$(resolve_worktree_path "$query")"
+  [ -n "$target" ] || return 0
+  case "$action" in
+    print) printf '%s\n' "$target" ;;
+    lazygit) open_lazygit "$target" ;;
+    cockpit) open_tmux_workspace "$target" "solo" ;;
+    *) die "unknown feature resume action: $action" ;;
+  esac
 }
 
 cmd_feature_ship() {
@@ -1532,7 +1556,7 @@ EOF
       ;;
     "Resume existing feature")
       cat <<'EOF'
-Pick an existing worktree and continue working.
+Resume a feature worktree.
 
 Options:
 - print the path
@@ -1722,11 +1746,12 @@ main() {
     feature)
       case "${1:-}" in
         start) shift; cmd_feature_start "$@" ;;
+        resume) shift; cmd_feature_resume "$@" ;;
         ship) shift; cmd_feature_ship "$@" ;;
         submit) shift; cmd_feature_submit "$@" ;;
         cleanup) shift; cmd_feature_cleanup "$@" ;;
         finish) shift; cmd_feature_finish "$@" ;;
-        *) die "usage: bga feature <start|ship|submit|cleanup|finish> ..." ;;
+        *) die "usage: bga feature <start|resume|ship|submit|cleanup|finish> ..." ;;
       esac
       ;;
     worktree|wt)

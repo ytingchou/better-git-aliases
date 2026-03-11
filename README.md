@@ -121,6 +121,7 @@ Optional shell functions:
 ```bash
 gdoctor      # check environment
 gwt          # jump to a selected worktree in the current shell
+fresume      # jump to a selected feature worktree in the current shell
 gmenu        # open the menu
 gcockpit     # tmux cockpit for current/selected worktree
 gcodex       # cd into a worktree, then launch codex
@@ -282,6 +283,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 ### Feature workflow
 
 - `git feature start <name> [base]`: create `feature/<name>` and a dedicated worktree
+- `git feature resume [query] [--print|--lazygit|--cockpit]`: resume a feature worktree
 - `git feature ship`: quick pre-push checklist for the current branch
 - `git feature submit [base]`: show ship summary, then publish the branch
 - `git feature cleanup [branch] [--base base] [--apply]`: preview or clean up a merged feature branch
@@ -374,6 +376,12 @@ Then jump there:
 gwt login-page
 ```
 
+Or use the feature-oriented helper:
+
+```bash
+fresume login-page
+```
+
 Or print the path with:
 
 ```bash
@@ -381,6 +389,13 @@ git wtpath login-page
 ```
 
 This is the core upgrade over branch switching. Each feature gets its own directory.
+
+If you come back later and want to resume with more context:
+
+```bash
+git feature resume login-page --lazygit
+git feature resume login-page --cockpit
+```
 
 ### 3. Work on multiple features at once
 

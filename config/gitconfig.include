@@ -11,6 +11,7 @@
   commits = "!\"$HOME/.local/bin/bga\" commits"
   prune-merged = "!\"$HOME/.local/bin/bga\" prune-merged"
   feature = "!f() { \"$HOME/.local/bin/bga\" feature \"$@\"; }; f"
+  fresume = "!f() { \"$HOME/.local/bin/bga\" feature resume \"$@\"; }; f"
   fsubmit = "!f() { \"$HOME/.local/bin/bga\" feature submit \"$@\"; }; f"
   fcleanup = "!f() { \"$HOME/.local/bin/bga\" feature cleanup \"$@\"; }; f"
   wt = "!f() { \"$HOME/.local/bin/bga\" worktree \"$@\"; }; f"
