@@ -274,10 +274,13 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 
 - `git feature start <name> [base]`: create `feature/<name>` and a dedicated worktree
 - `git feature ship`: quick pre-push checklist for the current branch
+- `git feature finish [branch] [--base base]`: remove merged managed worktrees and try to delete the local branch
 
 ### Worktree workflow
 
 - `git wt list`: list worktrees
+- `git wt stale [base]`: list stale managed worktrees already merged into the base branch
+- `git wt clean [base] [--apply]`: dry-run or remove stale managed worktrees
 - `git wta <branch> [base]`: create a new worktree under a shared `.worktrees/<repo>/` directory
 - `git wtrm [query]`: remove a selected worktree
 - `git wtpath [query]`: print a selected worktree path
@@ -644,6 +647,27 @@ When a feature is done and its worktree is no longer needed:
 git wtrm
 ```
 
+If you want a safer cleanup pass for managed worktrees:
+
+```bash
+git wt stale
+git wt clean
+git wt clean --apply
+```
+
+And if a feature branch is already merged into your base branch:
+
+```bash
+git feature finish my-feature --base main
+```
+
+This tries to:
+
+- remove managed worktrees for that branch
+- skip the current worktree
+- skip unmanaged paths
+- delete the local branch if it is no longer checked out anywhere
+
 With `fzf`, worktree selection shows:
 
 - branch name
@@ -671,6 +695,14 @@ git feature start pricing-copy
 git feature start api-timeout-fix
 git wt list
 git wttmux
+```
+
+Cleanup pattern after merge:
+
+```bash
+git wt stale
+git wt clean --apply
+git prune-merged
 ```
 
 ### AI-assisted workflow

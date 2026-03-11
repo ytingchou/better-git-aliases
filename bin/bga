@@ -156,6 +156,30 @@ list_worktrees() {
     }'
 }
 
+current_worktree_path() {
+  git rev-parse --path-format=absolute --show-toplevel 2>/dev/null
+}
+
+branch_worktrees() {
+  local branch="$1"
+  list_worktrees | awk -F'|' -v branch="$branch" '$2 == branch { print $1 "|" $2 }'
+}
+
+branch_is_merged_into() {
+  local branch="$1" base="$2"
+  git show-ref --verify --quiet "refs/heads/${branch}" || return 1
+  git show-ref --verify --quiet "refs/heads/${base}" || return 1
+  git merge-base --is-ancestor "refs/heads/${branch}" "refs/heads/${base}"
+}
+
+managed_worktree_path() {
+  local path="$1"
+  case "$path" in
+    "$(worktree_root)"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 worktree_picker() {
   if has fzf; then
     list_worktrees | fzf \
@@ -310,9 +334,14 @@ Core:
 Feature workflow:
   bga feature start NAME [BASE] Create branch + worktree
   bga feature ship              Status checklist before push/merge
+  bga feature finish [BRANCH] [--base BASE]
+                                Clean up merged feature branch + worktree
 
 Worktree workflow:
   bga worktree list             List worktrees
+  bga worktree stale [BASE]     List merged worktrees that are good cleanup candidates
+  bga worktree clean [BASE] [--apply]
+                                Remove stale managed worktrees
   bga worktree add NAME [BASE]  Create a new worktree for a branch
   bga worktree path [QUERY]     Print selected worktree path
   bga worktree remove [QUERY]   Remove a worktree
@@ -581,9 +610,9 @@ cmd_feature_start() {
   git fetch --all --prune
 
   if git show-ref --verify --quiet "refs/heads/${branch}"; then
-    git worktree add "$target_path" "$branch"
+    git worktree add "$target_path" "$branch" >/dev/null
   else
-    git worktree add -b "$branch" "$target_path" "$base"
+    git worktree add -b "$branch" "$target_path" "$base" >/dev/null
   fi
 
   printf '%s\n' "$target_path"
@@ -602,9 +631,120 @@ cmd_feature_ship() {
   git log --oneline -n 5
 }
 
+cmd_feature_finish() {
+  ensure_repo
+  local branch="" base="" current_path path current_branch_name deleted_branch=0
+  current_branch_name="$(current_branch)"
+  current_path="$(current_worktree_path)"
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --base)
+        shift
+        [ -n "${1:-}" ] || die "usage: bga feature finish [BRANCH] [--base BASE]"
+        base="$1"
+        ;;
+      *)
+        branch="$1"
+        ;;
+    esac
+    shift || true
+  done
+
+  [ -n "$branch" ] || branch="$current_branch_name"
+  [ -n "$branch" ] || die "usage: bga feature finish [BRANCH] [--base BASE]"
+  [ -n "$base" ] || base="$(default_base_branch)"
+
+  branch_is_merged_into "$branch" "$base" || die "branch '$branch' is not merged into '$base'"
+
+  printf 'Finishing branch: %s\n' "$branch"
+  printf 'Base branch:      %s\n' "$base"
+
+  while IFS='|' read -r path _; do
+    [ -n "$path" ] || continue
+    if [ "$path" = "$current_path" ]; then
+      printf 'Skip current worktree: %s\n' "$path"
+      continue
+    fi
+    if ! managed_worktree_path "$path"; then
+      printf 'Skip unmanaged worktree: %s\n' "$path"
+      continue
+    fi
+    git worktree remove "$path"
+    printf 'Removed worktree: %s\n' "$path"
+  done < <(branch_worktrees "$branch")
+
+  if git show-ref --verify --quiet "refs/heads/${branch}"; then
+    if git branch -d "$branch" >/dev/null 2>&1; then
+      printf 'Deleted local branch: %s\n' "$branch"
+      deleted_branch=1
+    else
+      printf 'Skipped deleting branch (still checked out in a worktree): %s\n' "$branch"
+    fi
+  fi
+
+  [ "$deleted_branch" -eq 1 ] || true
+}
+
 cmd_worktree_list() {
   ensure_repo
   list_worktrees | column -t -s '|'
+}
+
+cmd_worktree_stale() {
+  ensure_repo
+  local base="${1:-$(default_base_branch)}"
+  local current_path branch path found=0
+  current_path="$(current_worktree_path)"
+
+  while IFS='|' read -r path branch; do
+    [ -n "$path" ] || continue
+    [ -n "$branch" ] || continue
+    [ "$branch" = "detached" ] && continue
+    [ "$branch" = "$base" ] && continue
+    [ "$path" = "$current_path" ] && continue
+    managed_worktree_path "$path" || continue
+    if branch_is_merged_into "$branch" "$base"; then
+      printf '%s|%s|merged-into-%s\n' "$path" "$branch" "$base"
+      found=1
+    fi
+  done < <(list_worktrees)
+
+  [ "$found" -eq 1 ] || printf 'No stale managed worktrees found.\n'
+}
+
+cmd_worktree_clean() {
+  ensure_repo
+  local apply=0 base="" path branch reason
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --apply)
+        apply=1
+        ;;
+      *)
+        base="$1"
+        ;;
+    esac
+    shift || true
+  done
+  [ -n "$base" ] || base="$(default_base_branch)"
+
+  if [ "$apply" -eq 0 ]; then
+    printf 'Dry run. Use --apply to remove these stale managed worktrees.\n\n'
+  fi
+
+  while IFS='|' read -r path branch reason; do
+    case "$path" in
+      No\ stale\ managed\ worktrees\ found.) printf '%s\n' "$path"; return 0 ;;
+    esac
+    [ -n "$path" ] || continue
+    if [ "$apply" -eq 1 ]; then
+      git worktree remove "$path"
+      printf 'Removed: %s (%s)\n' "$path" "$branch"
+    else
+      printf 'Would remove: %s (%s, %s)\n' "$path" "$branch" "$reason"
+    fi
+  done < <(cmd_worktree_stale "$base")
 }
 
 resolve_worktree_path() {
@@ -635,9 +775,9 @@ cmd_worktree_add() {
   git fetch --all --prune
 
   if git show-ref --verify --quiet "refs/heads/${branch}"; then
-    git worktree add "$target_path" "$branch"
+    git worktree add "$target_path" "$branch" >/dev/null
   else
-    git worktree add -b "$branch" "$target_path" "$base"
+    git worktree add -b "$branch" "$target_path" "$base" >/dev/null
   fi
 
   printf '%s\n' "$target_path"
@@ -942,18 +1082,21 @@ main() {
       case "${1:-}" in
         start) shift; cmd_feature_start "$@" ;;
         ship) shift; cmd_feature_ship "$@" ;;
+        finish) shift; cmd_feature_finish "$@" ;;
         *) die "usage: bga feature <start|ship> ..." ;;
       esac
       ;;
     worktree|wt)
       case "${1:-list}" in
         list) shift; cmd_worktree_list "$@" ;;
+        stale) shift; cmd_worktree_stale "$@" ;;
+        clean) shift; cmd_worktree_clean "$@" ;;
         add) shift; cmd_worktree_add "$@" ;;
         path) shift; cmd_worktree_path "$@" ;;
         remove|rm) shift; cmd_worktree_remove "$@" ;;
         tmux) shift; cmd_worktree_tmux "$@" ;;
         lazygit|lg) shift; cmd_worktree_lazygit "$@" ;;
-        *) die "usage: bga worktree <list|add|path|remove|tmux|lazygit> ..." ;;
+        *) die "usage: bga worktree <list|stale|clean|add|path|remove|tmux|lazygit> ..." ;;
       esac
       ;;
     lazygit|lg) cmd_lazygit "$@" ;;
