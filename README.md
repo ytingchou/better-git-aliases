@@ -12,7 +12,7 @@ This repo does not try to replace Git. It wraps a few high-value workflows so th
 
 Current version: `0.1.0`
 
-License: [MIT](/home/yutingchou/vibe-coding/better-git-aliases/LICENSE)
+License: [MIT](LICENSE)
 
 ## Demo
 
@@ -79,7 +79,7 @@ Suggested screenshots to add:
 4. `lazygit` inside a feature worktree
 5. `git cockpit` tmux session with shell/git/AI windows
 
-Asset guidance lives in [docs/assets/README.md](/home/yutingchou/vibe-coding/better-git-aliases/docs/assets/README.md).
+Asset guidance lives in [docs/assets/README.md](docs/assets/README.md).
 
 If you want to capture your own demo later, this is a good sequence:
 
@@ -222,13 +222,19 @@ git lazygit-config install
 Git aliases cannot change your current shell directory. That matters for `worktree` workflows. To make jumping between worktrees ergonomic, add this to `~/.bashrc` or `~/.zshrc`:
 
 ```bash
-source "/home/yutingchou/vibe-coding/better-git-aliases/shell/bga.sh"
+source "/path/to/better-git-aliases/shell/bga.sh"
 ```
 
 Or generate the line dynamically:
 
 ```bash
 bga init bash
+```
+
+If you prefer writing it manually and you cloned this repo somewhere on disk, use your own clone path instead of a hard-coded example path:
+
+```bash
+source "/path/to/better-git-aliases/shell/bga.sh"
 ```
 
 The key helper is `gwt`, which changes the current shell into a selected worktree.
@@ -272,6 +278,8 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git cockpit [query]`: create/attach a tmux session with shell + git + AI windows
 
 ## Usage tutorial
+
+Want a shorter beginner-focused guide? See [docs/day-to-day.md](docs/day-to-day.md).
 
 ### 1. Learn the workflow in 30 seconds
 
@@ -656,6 +664,6 @@ That is what this repo is optimized for.
 
 ## Release metadata
 
-- Version: [VERSION](/home/yutingchou/vibe-coding/better-git-aliases/VERSION)
-- Changelog: [CHANGELOG.md](/home/yutingchou/vibe-coding/better-git-aliases/CHANGELOG.md)
-- License: [LICENSE](/home/yutingchou/vibe-coding/better-git-aliases/LICENSE)
+- Version: [VERSION](VERSION)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- License: [LICENSE](LICENSE)
