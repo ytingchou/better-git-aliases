@@ -270,7 +270,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git lazygit-config merge-hint`: show a safe merge workflow for custom configs
 - `git workflow-help`: show all supported commands
 - `git menu`: open an interactive task-oriented menu with descriptions
-- `git dash`: show repo status, worktrees, and recent branches
+- `git dash`: show repo status plus attention signals for dirty worktrees, stale worktrees, and branch/upstream state
 
 ### Daily commands
 
@@ -641,6 +641,13 @@ At the start of work:
 git sync
 git dash
 ```
+
+The newer `git dash` is opinionated on purpose. It tries to answer:
+
+- what needs attention right now
+- which worktrees are dirty
+- which managed worktrees are stale
+- whether the current branch is ahead/behind or missing an upstream
 
 When you need another branch quickly:
 

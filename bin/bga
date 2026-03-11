@@ -208,6 +208,119 @@ managed_worktree_path() {
   esac
 }
 
+repo_is_dirty() {
+  local path="$1"
+  (
+    cd "$path" || exit 1
+    ! git diff --quiet || ! git diff --cached --quiet
+  )
+}
+
+branch_upstream() {
+  local branch="$1"
+  git rev-parse --abbrev-ref --symbolic-full-name "${branch}@{upstream}" 2>/dev/null || true
+}
+
+branch_ahead_behind() {
+  local branch="$1" upstream
+  upstream="$(branch_upstream "$branch")"
+  [ -n "$upstream" ] || return 1
+  git rev-list --left-right --count "${branch}...${upstream}" 2>/dev/null
+}
+
+parse_ahead_behind() {
+  local counts="$1"
+  local ahead behind
+  IFS=$'\t' read -r ahead behind <<EOF
+$counts
+EOF
+  printf '%s %s\n' "${ahead:-0}" "${behind:-0}"
+}
+
+print_dashboard_attention() {
+  local current_path branch path found=0 counts parsed ahead behind
+  current_path="$(current_worktree_path)"
+  printf 'attention:\n'
+
+  if repo_is_dirty "$current_path"; then
+    printf '  - current worktree has uncommitted changes\n'
+    found=1
+  fi
+
+  branch="$(current_branch)"
+  if [ -n "$branch" ]; then
+    counts="$(branch_ahead_behind "$branch" || true)"
+    if [ -n "$counts" ]; then
+      parsed="$(parse_ahead_behind "$counts")"
+      ahead="${parsed%% *}"
+      behind="${parsed##* }"
+      if [ "${ahead:-0}" -gt 0 ] || [ "${behind:-0}" -gt 0 ]; then
+        printf '  - current branch %s is ahead %s / behind %s vs upstream\n' "$branch" "$ahead" "$behind"
+        found=1
+      fi
+    else
+      printf '  - current branch %s has no upstream\n' "$branch"
+      found=1
+    fi
+  fi
+
+  while IFS='|' read -r path branch; do
+    [ -n "$path" ] || continue
+    [ "$path" = "$current_path" ] && continue
+    if repo_is_dirty "$path"; then
+      printf '  - dirty worktree: %s (%s)\n' "$path" "$branch"
+      found=1
+    fi
+  done < <(list_worktrees)
+
+  while IFS='|' read -r path branch reason; do
+    case "$path" in
+      No\ stale\ managed\ worktrees\ found.) break ;;
+    esac
+    [ -n "$path" ] || continue
+    printf '  - stale worktree: %s (%s)\n' "$path" "$branch"
+    found=1
+  done < <(cmd_worktree_stale "$(default_base_branch)")
+
+  [ "$found" -eq 1 ] || printf '  - nothing urgent\n'
+}
+
+print_dashboard_worktrees() {
+  local current_path path branch marker dirty
+  current_path="$(current_worktree_path)"
+  printf 'worktrees:\n'
+  while IFS='|' read -r path branch; do
+    [ -n "$path" ] || continue
+    marker=' '
+    [ "$path" = "$current_path" ] && marker='*'
+    dirty='clean'
+    if repo_is_dirty "$path"; then
+      dirty='dirty'
+    fi
+    printf '  %s %s | %s | %s\n' "$marker" "$branch" "$dirty" "$path"
+  done < <(list_worktrees)
+}
+
+print_dashboard_recent_branches() {
+  local branch when author subject upstream counts parsed ahead behind line_count=0
+  printf 'recent branches:\n'
+  while IFS='|' read -r branch when author subject; do
+    [ -n "$branch" ] || continue
+    upstream="$(branch_upstream "${branch#origin/}")"
+    if [ -n "$upstream" ]; then
+      counts="$(branch_ahead_behind "${branch#origin/}" || true)"
+      parsed="$(parse_ahead_behind "$counts")"
+      ahead="${parsed%% *}"
+      behind="${parsed##* }"
+      printf '  %s | %s | ahead %s / behind %s | %s\n' "$branch" "$when" "${ahead:-0}" "${behind:-0}" "$subject"
+    else
+      printf '  %s | %s | no upstream | %s\n' "$branch" "$when" "$subject"
+    fi
+    line_count=$((line_count + 1))
+    [ "$line_count" -ge 8 ] && break
+  done < <(list_branches)
+}
+
 worktree_picker() {
   if has fzf; then
     list_worktrees | fzf \
@@ -606,12 +719,15 @@ cmd_dashboard() {
   branch="$(current_branch)"
   printf 'repo:      %s\n' "$root"
   printf 'branch:    %s\n' "${branch:-detached}"
+  printf 'base:      %s\n' "$(default_base_branch)"
   printf 'status:\n'
   git status -sb
-  printf '\nworktrees:\n'
-  list_worktrees | column -t -s '|'
-  printf '\nrecent branches:\n'
-  list_branches | head -n 8 | column -t -s '|'
+  printf '\n'
+  print_dashboard_attention
+  printf '\n'
+  print_dashboard_worktrees
+  printf '\n'
+  print_dashboard_recent_branches
 }
 
 cmd_sync() {
