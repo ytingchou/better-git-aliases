@@ -504,6 +504,7 @@ Core:
   bga start-day                 Run doctor, sync, and dashboard in sequence
   bga dashboard                 Show repo + worktree overview
   bga sync                      Fetch and rebase current branch
+  bga review [status|diff]      Review current branch before commit/submit
   bga recent                    Pick and checkout a recent branch
   bga commits                   Browse commits with preview
   bga prune-merged              Delete merged local branches safely
@@ -803,6 +804,37 @@ cmd_sync() {
   else
     printf 'No upstream set for %s. Fetched remotes only.\n' "$branch"
   fi
+}
+
+cmd_review() {
+  ensure_repo
+  case "${1:-default}" in
+    default)
+      if has lazygit; then
+        open_lazygit "."
+      else
+        cmd_review status
+      fi
+      ;;
+    status)
+      printf 'Review status\n\n'
+      git status -sb
+      printf '\nRecent commits:\n'
+      git log --oneline -n 8
+      ;;
+    diff)
+      if has lazygit; then
+        open_lazygit "."
+      else
+        git diff --stat
+        printf '\n'
+        git diff
+      fi
+      ;;
+    *)
+      die "usage: bga review [status|diff]"
+      ;;
+  esac
 }
 
 cmd_recent() {
@@ -1481,7 +1513,7 @@ run_menu_action() {
     "Start a new feature") menu_prompt_feature_start ;;
     "Resume existing feature") menu_prompt_resume_feature ;;
     "Pause current feature") cmd_feature_pause ;;
-    "Review and commit changes") menu_review_and_commit ;;
+    "Review and commit changes") cmd_review ;;
     "Submit current feature for review") cmd_feature_submit ;;
     "Clean up current feature after merge") cmd_feature_cleanup ;;
     "Clean up merged work") menu_cleanup_merged_work ;;
@@ -1618,11 +1650,11 @@ EOF
       ;;
     "Review and commit changes")
       cat <<'EOF'
-Open the safest review flow before commit.
+Open the recommended review flow before commit or submit.
 
 Behavior:
-- opens lazygit if available
-- otherwise falls back to git status with a hint
+- opens lazygit when available
+- otherwise shows status and recent commits
 EOF
       ;;
     "Clean up merged work")
@@ -1792,6 +1824,7 @@ main() {
     menu) cmd_menu ;;
     dashboard|dash) cmd_dashboard ;;
     sync) cmd_sync ;;
+    review) cmd_review "$@" ;;
     recent) cmd_recent ;;
     commits) cmd_commits ;;
     prune-merged) cmd_prune_merged ;;

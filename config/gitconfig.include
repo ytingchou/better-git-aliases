@@ -7,6 +7,7 @@
   menu = "!\"$HOME/.local/bin/bga\" menu"
   dash = "!\"$HOME/.local/bin/bga\" dashboard"
   sync = "!\"$HOME/.local/bin/bga\" sync"
+  review = "!f() { \"$HOME/.local/bin/bga\" review \"$@\"; }; f"
   recent = "!\"$HOME/.local/bin/bga\" recent"
   commits = "!\"$HOME/.local/bin/bga\" commits"
   prune-merged = "!\"$HOME/.local/bin/bga\" prune-merged"

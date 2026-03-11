@@ -159,6 +159,7 @@ With `fzf`, these commands become much better:
 
 - `git menu`: command descriptions in a side preview
 - `git menu`: beginner-friendly task actions like starting a feature, resuming work, reviewing changes, and cleanup
+- `git review [status|diff]`: one review entrypoint before commit or submit
 - `git recent`: branch picker with commit/log preview
 - `git wt ...`: worktree picker with status/log/file preview
 - `git commits`: patch preview while browsing history
@@ -526,6 +527,14 @@ Before every commit:
 4. Make sure the commit only contains one idea
 
 If the patch feels mixed, split it before you commit.
+
+If you want a single review entrypoint:
+
+```bash
+git review
+git review status
+git review diff
+```
 
 ### 4.4 Branch switching and recent work
 
