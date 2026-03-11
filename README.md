@@ -185,6 +185,7 @@ You can also store a few defaults without editing scripts:
 git config-bga set base_branch main
 git config-bga set remote origin
 git config-bga set cockpit_layout review
+git config-bga set workspace_root ~/src
 git config-bga list
 ```
 
@@ -311,6 +312,12 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git wttmux [query]`: open a selected worktree in a tmux session
 - `git wttmux [query] --layout <solo|review|ai-pair|multi-feature>`: open a selected worktree in a chosen tmux layout
 
+### Workspace workflow
+
+- `git ws list [root]`: list detected repos under the workspace root
+- `git wsdash [root]`: show branch, dirty state, upstream state, and worktree count across repos
+- `git wssync [root]`: fetch all repos in the workspace and rebase branches that already have an upstream
+
 ### Tool integration
 
 - `git lg [query]`: open `lazygit` in current or selected worktree
@@ -325,7 +332,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git cockpit [query]`: create/attach a tmux session with shell + git + AI windows
 - `git cockpit list-layouts`: show available tmux cockpit layouts
 - `git cockpit [query] --layout <solo|review|ai-pair|multi-feature>`: choose a cockpit layout explicitly
-- `git config-bga get|set|list`: manage simple defaults such as `base_branch`, `remote`, and `cockpit_layout`
+- `git config-bga get|set|list`: manage simple defaults such as `base_branch`, `remote`, `cockpit_layout`, and `workspace_root`
 
 ## Usage tutorial
 
@@ -764,6 +771,19 @@ Or, if you want the pieces separately:
 ```bash
 git sync
 git dash
+```
+
+If you work across several repos under one parent directory:
+
+```bash
+git wsdash
+git wssync
+```
+
+If your repos live under a fixed root, store it once:
+
+```bash
+git config-bga set workspace_root ~/src
 ```
 
 At the end of work:

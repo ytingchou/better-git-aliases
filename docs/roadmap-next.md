@@ -8,7 +8,7 @@ The project direction is now clearer:
 - optimize for real daily usage
 - prefer complete workflow actions over more tiny aliases
 
-## Now
+## Done
 
 ### 1. Feature resume flow
 
@@ -57,21 +57,20 @@ Why:
 
 - review quality matters more than alias count
 
-## Next
-
 ### 4. Repo/workspace overview
 
 Goal:
 
 - scale from one repo to several active repos
 
-Possible additions:
+Delivered:
 
+- `bga workspace list`
 - `bga workspace dash`
 - `bga workspace sync`
-- `bga workspace list`
+- `workspace_root` config override
 
-Why:
+Why it mattered:
 
 - many engineers juggle multiple repos during the same day
 
@@ -81,19 +80,55 @@ Goal:
 
 - make behavior easier to tune without editing scripts
 
-Possible additions:
+Delivered:
 
 - default base branch override
 - preferred remote override
 - preferred cockpit layout
+- workspace root override
 
-Why:
+Why it mattered:
 
 - current defaults are good, but teams eventually want their own conventions
 
+## Next
+### 6. Team conventions
+
+Goal:
+
+- let a repo or team share a few workflow defaults without everyone hand-tuning local config
+
+Possible additions:
+
+- repo-level `.bga.env` or `.bga.config`
+- default base branch
+- preferred remote
+- preferred cockpit layout
+- optional protected branch list
+
+Why:
+
+- local config is useful, but team conventions should not depend on tribal knowledge
+
+### 7. Workspace action menu
+
+Goal:
+
+- make multi-repo work feel as guided as the single-repo menu
+
+Possible additions:
+
+- `bga workspace menu`
+- pick repo then action
+- workspace-level recent repo picker
+
+Why:
+
+- once users manage several repos, discoverability matters again
+
 ## Later
 
-### 6. Provider abstraction
+### 8. Provider abstraction
 
 Goal:
 
@@ -108,7 +143,7 @@ Why:
 
 - useful, but not required for the main Git-native workflow
 
-### 7. Demo polish
+### 9. Demo polish
 
 Goal:
 

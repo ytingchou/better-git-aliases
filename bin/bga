@@ -151,6 +151,17 @@ default_base_branch() {
   fi
 }
 
+workspace_root() {
+  local configured root
+  configured="$(config_get workspace_root || true)"
+  if [ -n "$configured" ]; then
+    printf '%s\n' "$configured"
+    return 0
+  fi
+  root="$(repo_root 2>/dev/null || pwd)"
+  printf '%s\n' "$(dirname "$root")"
+}
+
 worktree_root() {
   local root name parent
   root="$(repo_root)"
@@ -249,6 +260,58 @@ repo_is_dirty() {
     cd "$path" || exit 1
     ! git diff --quiet || ! git diff --cached --quiet
   )
+}
+
+workspace_repo_roots() {
+  local root="${1:-$(workspace_root)}" current="" explicit_root=0
+  [ -d "$root" ] || die "workspace root does not exist: $root"
+  [ $# -gt 0 ] && explicit_root=1
+  current="$(repo_root 2>/dev/null || true)"
+  {
+    if [ -n "$current" ]; then
+      case "$current" in
+        "$root"/*|"$root") printf '%s\n' "$current" ;;
+        *)
+          [ "$explicit_root" -eq 0 ] && printf '%s\n' "$current"
+          ;;
+      esac
+    fi
+    find "$root" -mindepth 1 -maxdepth 4 \( -type d -name .git -o -type f -name .git \) -print 2>/dev/null \
+      | while IFS= read -r gitpath; do
+          case "$gitpath" in
+            */.worktrees/*) continue ;;
+          esac
+          dirname "$gitpath"
+        done
+  } | awk 'NF && !seen[$0]++'
+}
+
+workspace_repo_branch() {
+  local path="$1"
+  (cd "$path" && current_branch)
+}
+
+workspace_repo_upstream_summary() {
+  local path="$1" branch counts parsed ahead behind
+  branch="$(workspace_repo_branch "$path")"
+  [ -n "$branch" ] || {
+    printf 'detached\n'
+    return 0
+  }
+  counts="$(cd "$path" && branch_ahead_behind "$branch" || true)"
+  if [ -n "$counts" ]; then
+    parsed="$(parse_ahead_behind "$counts")"
+    ahead="${parsed%% *}"
+    behind="${parsed##* }"
+    printf 'ahead %s / behind %s\n' "${ahead:-0}" "${behind:-0}"
+  else
+    printf 'no upstream\n'
+  fi
+}
+
+workspace_repo_worktree_count() {
+  local path="$1"
+  (cd "$path" && list_worktrees | awk 'NF { c++ } END { print c + 0 }')
 }
 
 branch_upstream() {
@@ -540,6 +603,8 @@ Core:
   bga start-day                 Run doctor, sync, and dashboard in sequence
   bga finish-day                Run pause summary and dashboard in sequence
   bga dashboard                 Show repo + worktree overview
+  bga workspace <list|dash|sync> [ROOT]
+                                Show or sync repos under one workspace root
   bga sync                      Fetch and rebase current branch
   bga review [status|diff]      Review current branch before commit/submit
   bga recent                    Pick and checkout a recent branch
@@ -599,6 +664,7 @@ Recommended git aliases after install:
   git finish-day
   git menu
   git dash
+  git ws / git wsdash / git wssync
   git sync
   git recent
   git wt / git wta / git wtrm / git wttmux
@@ -888,6 +954,71 @@ cmd_sync() {
   else
     printf 'No upstream set for %s. Fetched remotes only.\n' "$branch"
   fi
+}
+
+cmd_workspace_list() {
+  local root="${1:-$(workspace_root)}" repo
+  printf 'workspace root: %s\n\n' "$root"
+  while IFS= read -r repo; do
+    [ -n "$repo" ] || continue
+    printf '%s\n' "$repo"
+  done < <(workspace_repo_roots "$root")
+}
+
+cmd_workspace_dash() {
+  local root="${1:-$(workspace_root)}" repo branch dirty upstream worktrees
+  printf 'workspace root: %s\n\n' "$root"
+  while IFS= read -r repo; do
+    [ -n "$repo" ] || continue
+    branch="$(workspace_repo_branch "$repo")"
+    dirty='clean'
+    if repo_is_dirty "$repo"; then
+      dirty='dirty'
+    fi
+    upstream="$(workspace_repo_upstream_summary "$repo")"
+    worktrees="$(workspace_repo_worktree_count "$repo")"
+    printf '%s\n' "$repo"
+    printf '  branch:    %s\n' "${branch:-detached}"
+    printf '  status:    %s\n' "$dirty"
+    printf '  upstream:  %s\n' "$upstream"
+    printf '  worktrees: %s\n\n' "$worktrees"
+  done < <(workspace_repo_roots "$root")
+}
+
+cmd_workspace_sync() {
+  local root="${1:-$(workspace_root)}" repo branch upstream
+  printf 'workspace root: %s\n\n' "$root"
+  while IFS= read -r repo; do
+    [ -n "$repo" ] || continue
+    printf '==> %s\n' "$repo"
+    (
+      cd "$repo" || exit 1
+      git fetch --all --prune
+      branch="$(current_branch)"
+      if [ -n "$branch" ]; then
+        upstream="$(git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" 2>/dev/null || true)"
+        if [ -n "$upstream" ]; then
+          git pull --rebase --autostash
+        else
+          printf 'No upstream set for %s. Fetched remotes only.\n' "$branch"
+        fi
+      else
+        printf 'Detached HEAD. Fetched remotes only.\n'
+      fi
+    )
+    printf '\n'
+  done < <(workspace_repo_roots "$root")
+}
+
+cmd_workspace() {
+  local action="${1:-dash}"
+  shift || true
+  case "$action" in
+    list) cmd_workspace_list "${1:-}" ;;
+    dash) cmd_workspace_dash "${1:-}" ;;
+    sync) cmd_workspace_sync "${1:-}" ;;
+    *) die "usage: bga workspace <list|dash|sync> [ROOT]" ;;
+  esac
 }
 
 cmd_review() {
@@ -1604,6 +1735,8 @@ run_menu_action() {
     "Submit current feature for review") cmd_feature_submit ;;
     "Clean up current feature after merge") cmd_feature_cleanup ;;
     "Clean up merged work") menu_cleanup_merged_work ;;
+    "Workspace overview") cmd_workspace dash ;;
+    "Sync all repos in workspace") cmd_workspace sync ;;
     "Doctor") cmd_doctor ;;
     "Configure defaults") cmd_config list ;;
     "Bootstrap dependencies") cmd_bootstrap ;;
@@ -1772,6 +1905,30 @@ Behavior:
 - also prunes merged local branches
 EOF
       ;;
+    "Workspace overview")
+      cat <<'EOF'
+Show all detected repos under the workspace root.
+
+Useful when:
+- you are juggling several repos in the same parent directory
+- you want a quick branch/dirty/worktree summary across repos
+
+Tip:
+- set a fixed root with: git config-bga set workspace_root /path/to/workspace
+EOF
+      ;;
+    "Sync all repos in workspace")
+      cat <<'EOF'
+Fetch all repos under the workspace root and rebase branches that already have an upstream.
+
+Useful when:
+- you start the day across several active repos
+- you want a safe batch sync without leaving the terminal
+
+Tip:
+- set a fixed root with: git config-bga set workspace_root /path/to/workspace
+EOF
+      ;;
     "Bootstrap dependencies")
       cat <<'EOF'
 Install recommended dependencies.
@@ -1896,7 +2053,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start the workday\nFinish the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nDoctor\nConfigure defaults\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
+  items=$'Start the workday\nFinish the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nWorkspace overview\nSync all repos in workspace\nDoctor\nConfigure defaults\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \
@@ -1930,6 +2087,7 @@ main() {
     finish-day) cmd_finish_day "$@" ;;
     menu) cmd_menu ;;
     dashboard|dash) cmd_dashboard ;;
+    workspace) cmd_workspace "$@" ;;
     sync) cmd_sync ;;
     review) cmd_review "$@" ;;
     recent) cmd_recent ;;
