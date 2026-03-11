@@ -57,6 +57,34 @@ timestamp() {
   date '+%Y%m%d-%H%M%S'
 }
 
+path_has_dir() {
+  local dir="$1" item old_ifs
+  old_ifs="${IFS:- }"
+  IFS=':'
+  for item in $PATH; do
+    [ "$item" = "$dir" ] && IFS="$old_ifs" && return 0
+  done
+  IFS="$old_ifs"
+  return 1
+}
+
+shell_rc_path() {
+  local shell_name
+  shell_name="$(basename "${SHELL:-bash}")"
+  case "$shell_name" in
+    zsh) printf '%s/.zshrc\n' "$HOME" ;;
+    bash|*) printf '%s/.bashrc\n' "$HOME" ;;
+  esac
+}
+
+shell_rc_mentions_helper() {
+  local rc helper
+  rc="$(shell_rc_path)"
+  helper="$(shell_helper_path)"
+  [ -f "$rc" ] || return 1
+  grep -Fq "$helper" "$rc"
+}
+
 die() {
   printf 'bga: %s\n' "$*" >&2
   exit 1
@@ -404,11 +432,26 @@ cmd_doctor() {
     printf '  [miss] %s\n' "$(config_home)/gitconfig.include"
   fi
 
+  printf '\npath:\n'
+  if path_has_dir "${HOME}/.local/bin"; then
+    printf '  [ok]   ~/.local/bin is in PATH\n'
+  else
+    printf '  [miss] ~/.local/bin is not in PATH\n'
+    printf '  [hint] add this to %s:\n' "$(shell_rc_path)"
+    printf '         export PATH="$HOME/.local/bin:$PATH"\n'
+  fi
+
   printf '\nshell helpers:\n'
   if [ -n "${BGA_SHELL_LOADED:-}" ]; then
     printf '  [ok]   current shell already sourced bga.sh\n'
   elif [ -f "$(shell_helper_path)" ]; then
     printf '  [info] source %s to enable gwt/gcodex/gcline/gcockpit\n' "$(shell_helper_path)"
+    if shell_rc_mentions_helper; then
+      printf '  [ok]   shell rc references the helper file\n'
+    else
+      printf '  [hint] add this to %s:\n' "$(shell_rc_path)"
+      printf '         source "%s"\n' "$(shell_helper_path)"
+    fi
   else
     printf '  [miss] shell helper file not found\n'
   fi
@@ -420,11 +463,39 @@ cmd_doctor() {
     printf '  [info] run: bga lazygit-config install\n'
   fi
 
+  printf '\ninteractive features:\n'
+  if has fzf; then
+    printf '  [ok]   fzf pickers are available\n'
+  else
+    printf '  [skip] fzf not found; menu/recent/worktree pickers fall back to simpler behavior\n'
+  fi
+  if has tmux; then
+    printf '  [ok]   tmux cockpit is available\n'
+  else
+    printf '  [skip] tmux not found; cockpit layouts are unavailable\n'
+  fi
+  if has lazygit; then
+    printf '  [ok]   lazygit integration is available\n'
+  else
+    printf '  [skip] lazygit not found; git status fallback will be used in tmux/git flows\n'
+  fi
+
   printf '\nembedded assets:\n'
-  if asset_path "lazygit/template.yml" >/dev/null 2>&1; then
-    printf '  [ok]   %s\n' "$(asset_path "lazygit/template.yml")"
+  if managed_lazygit_template_path >/dev/null 2>&1; then
+    printf '  [ok]   %s\n' "$(managed_lazygit_template_path)"
   else
     printf '  [miss] lazygit template not found\n'
+  fi
+
+  printf '\nnext steps:\n'
+  if ! has fzf || ! has tmux || ! has lazygit || ! path_has_dir "${HOME}/.local/bin"; then
+    printf '  - run: git bootstrap\n'
+  fi
+  if [ ! -f "${HOME}/.config/lazygit/config.yml" ]; then
+    printf '  - run: git lazygit-config install\n'
+  fi
+  if [ -f "$(shell_helper_path)" ] && [ -z "${BGA_SHELL_LOADED:-}" ]; then
+    printf '  - add shell helper to %s and reload your shell\n' "$(shell_rc_path)"
   fi
 
   [ "$missing" -eq 0 ] || return 1

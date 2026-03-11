@@ -197,6 +197,14 @@ Then verify:
 git doctor
 ```
 
+`git doctor` now checks more than binary presence. It also reports:
+
+- whether `~/.local/bin` is in `PATH`
+- whether your shell rc references the helper script
+- whether lazygit config is installed
+- whether `fzf`, `tmux`, and `lazygit` features are actually available
+- suggested next steps when something is missing
+
 If you want the repo to help install common tools:
 
 ```bash
