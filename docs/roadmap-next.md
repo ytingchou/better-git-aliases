@@ -154,19 +154,36 @@ Goal:
 
 - improve adoption from the repo homepage and docs
 
-Possible additions:
+Delivered:
 
-- actual screenshots
-- animated terminal gifs
+- demo workspace setup script
 - richer workspace and team-config examples
 
-Why:
+Why it mattered:
 
 - the workflow is now deeper, so showing it matters more
 
+## Next
+
+### 10. Release ergonomics
+
+Goal:
+
+- reduce the manual work required to cut the next release
+
+Possible additions:
+
+- simple release prep script
+- version consistency checks
+- release note scaffolding
+
+Why:
+
+- releases are frequent enough now that the process should be tighter
+
 ## Later
 
-### 10. Provider abstraction
+### 11. Provider abstraction
 
 Goal:
 

@@ -34,6 +34,22 @@ What that gives you:
 - a tmux workspace around that worktree
 - `lazygit` and optional AI CLI support in the same context
 
+### Workspace demo setup
+
+If you want a safe throwaway multi-repo playground:
+
+```bash
+./scripts/demo-workspace.sh
+```
+
+That creates two local demo repos plus one committed `.bga.env` so you can try:
+
+```bash
+git wsdash
+git wsmenu
+git config-bga list
+```
+
 ### Terminal walkthrough
 
 ```text
