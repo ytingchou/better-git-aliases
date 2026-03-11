@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.4.1] - 2026-03-12
+
+### Added
+
+- `protected_branches` support in repo defaults and user overrides
+- `scripts/demo-workspace.sh` for a safe multi-repo playground
+- `release-check` command and `git release-check` alias
+
+### Changed
+
+- `prune-merged` and feature cleanup previews now honor configured protected branches
+- Demo and roadmap docs now cover workspace setup and release consistency checks
+
 ## [0.4.0] - 2026-03-12
 
 ### Added
