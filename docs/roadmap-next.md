@@ -171,13 +171,13 @@ Goal:
 
 - reduce the manual work required to cut the next release
 
-Possible additions:
+Delivered:
 
-- simple release prep script
 - version consistency checks
-- release note scaffolding
+- `release-check` command
+- release note presence check
 
-Why:
+Why it mattered:
 
 - releases are frequent enough now that the process should be tighter
 

@@ -299,6 +299,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 ### Discovery
 
 - `git doctor`: check whether required/recommended tools are installed
+- `git release-check`: verify release version consistency and required release files
 - `git bootstrap [brew|apt]`: install recommended dependencies
 - `git lazygit-config install`: install the bundled lazygit config
 - `git lazygit-config path`: print the active lazygit config path

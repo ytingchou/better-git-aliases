@@ -714,6 +714,7 @@ better-git-aliases
 Core:
   bga help                      Show this help
   bga doctor                    Check environment and dependencies
+  bga release-check             Verify version, release files, and tag readiness
   bga config <get|set|list>     Manage simple better-git-aliases config
   bga bootstrap [brew|apt]      Install recommended dependencies
   bga lazygit-config <subcmd>   Manage curated lazygit config
@@ -775,6 +776,7 @@ Shell integration:
 
 Recommended git aliases after install:
   git doctor
+  git release-check
   git config-bga
   git bootstrap
   git lazygit-config
@@ -910,6 +912,51 @@ EOF
   fi
 
   [ "$missing" -eq 0 ] || return 1
+}
+
+cmd_release_check() {
+  local version note_file status=0
+  version="$(cat "${BGA_ROOT}/VERSION" 2>/dev/null || true)"
+  [ -n "$version" ] || die "VERSION file is missing or empty"
+  note_file="${BGA_ROOT}/release-notes/v${version}.md"
+
+  printf 'release-check\n\n'
+
+  if grep -Fq "Current version: \`${version}\`" "${BGA_ROOT}/README.md"; then
+    printf '  [ok]   README current version matches %s\n' "$version"
+  else
+    printf '  [miss] README current version does not match %s\n' "$version"
+    status=1
+  fi
+
+  if grep -Fq "## [${version}] -" "${BGA_ROOT}/CHANGELOG.md"; then
+    printf '  [ok]   CHANGELOG has section for %s\n' "$version"
+  else
+    printf '  [miss] CHANGELOG is missing section for %s\n' "$version"
+    status=1
+  fi
+
+  if [ -f "$note_file" ]; then
+    printf '  [ok]   %s\n' "$note_file"
+  else
+    printf '  [miss] %s\n' "$note_file"
+    status=1
+  fi
+
+  if git diff --quiet && git diff --cached --quiet; then
+    printf '  [ok]   working tree is clean\n'
+  else
+    printf '  [miss] working tree has uncommitted changes\n'
+    status=1
+  fi
+
+  if git rev-parse -q --verify "refs/tags/v${version}" >/dev/null 2>&1; then
+    printf '  [info] tag v%s already exists\n' "$version"
+  else
+    printf '  [ok]   tag v%s does not exist yet\n' "$version"
+  fi
+
+  return "$status"
 }
 
 cmd_bootstrap() {
@@ -2282,6 +2329,7 @@ main() {
     __menu-preview) menu_preview "${1:-}" ;;
     help|-h|--help) cmd_help ;;
     doctor) cmd_doctor ;;
+    release-check) cmd_release_check ;;
     config) cmd_config "$@" ;;
     bootstrap) cmd_bootstrap "$@" ;;
     lazygit-config) cmd_lazygit_config "$@" ;;
