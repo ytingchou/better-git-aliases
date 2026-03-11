@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.4.0] - 2026-03-12
+
+### Added
+
+- Config layer for personal overrides via `git config-bga`
+- Workspace workflow commands:
+  - `workspace list`
+  - `workspace dash`
+  - `workspace sync`
+  - `workspace menu`
+- Repo-level `.bga.env` conventions for shared team defaults
+- Workspace aliases:
+  - `git ws`
+  - `git wsdash`
+  - `git wssync`
+  - `git wsmenu`
+- Example repo config file: `.bga.env.example`
+
+### Changed
+
+- Config resolution now follows `user override > repo defaults > built-in defaults`
+- Menu now includes workspace-oriented actions
+- README and roadmap now document workspace usage and team conventions
+
 ## [0.3.0] - 2026-03-12
 
 ### Added
