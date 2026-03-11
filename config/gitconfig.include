@@ -21,6 +21,7 @@
   ghrepo = "!f() { \"$HOME/.local/bin/bga\" github repo \"$@\"; }; f"
   ghstatus = "!f() { \"$HOME/.local/bin/bga\" github status \"$@\"; }; f"
   ghpublish = "!f() { \"$HOME/.local/bin/bga\" github publish \"$@\"; }; f"
+  ghsubmit = "!f() { \"$HOME/.local/bin/bga\" github submit \"$@\"; }; f"
   ghcompare = "!f() { \"$HOME/.local/bin/bga\" github compare \"$@\"; }; f"
   ghpr = "!f() { \"$HOME/.local/bin/bga\" github pr \"$@\"; }; f"
   cockpit = "!f() { \"$HOME/.local/bin/bga\" cockpit \"$@\"; }; f"

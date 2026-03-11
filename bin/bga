@@ -532,6 +532,8 @@ Tool integrations:
   bga github repo [--open]      Print or open the GitHub repo URL
   bga github status [BASE]      Show branch publish and review context
   bga github publish            Push current branch and set upstream if needed
+  bga github submit [BASE] [--open]
+                                Publish current branch, then print/open the PR URL
   bga github compare [BASE] [--open]
                                 Print or open the compare URL for current branch
   bga github pr [BASE] [--open] Print or open the new PR URL for current branch
@@ -1129,6 +1131,32 @@ cmd_github_publish() {
   fi
 }
 
+cmd_github_submit() {
+  ensure_repo
+  local base="" open_flag=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --open) open_flag=1 ;;
+      *) base="$1" ;;
+    esac
+    shift || true
+  done
+  cmd_github_publish
+  if [ "$open_flag" -eq 1 ]; then
+    if [ -n "$base" ]; then
+      cmd_github_pr "$base" --open
+    else
+      cmd_github_pr --open
+    fi
+  else
+    if [ -n "$base" ]; then
+      cmd_github_pr "$base"
+    else
+      cmd_github_pr
+    fi
+  fi
+}
+
 cmd_github_compare() {
   ensure_repo
   local base="" open_flag=0 branch url repo_url
@@ -1290,6 +1318,7 @@ run_menu_action() {
     "Clean up merged work") menu_cleanup_merged_work ;;
     "Show GitHub status for current branch") cmd_github_status ;;
     "Publish current branch to GitHub") cmd_github_publish ;;
+    "Publish branch and open PR flow") cmd_github_submit --open ;;
     "Open GitHub compare for current branch") cmd_github_compare --open ;;
     "Open GitHub PR page for current branch") cmd_github_pr --open ;;
     "Doctor") cmd_doctor ;;
@@ -1350,6 +1379,15 @@ Push the current branch to origin.
 Behavior:
 - if the branch already has an upstream, run a normal push
 - otherwise push with -u to set upstream tracking
+EOF
+      ;;
+    "Publish branch and open PR flow")
+      cat <<'EOF'
+Push the current branch first, then open the GitHub PR page.
+
+Good when:
+- the branch is ready for review
+- you want one command from local work to PR creation
 EOF
       ;;
     "Open GitHub PR page for current branch")
@@ -1523,7 +1561,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nClean up merged work\nShow GitHub status for current branch\nPublish current branch to GitHub\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nHelp'
+  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nClean up merged work\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \
@@ -1587,9 +1625,10 @@ main() {
         repo) shift; cmd_github_repo "$@" ;;
         status) shift; cmd_github_status "$@" ;;
         publish) shift; cmd_github_publish "$@" ;;
+        submit) shift; cmd_github_submit "$@" ;;
         compare) shift; cmd_github_compare "$@" ;;
         pr) shift; cmd_github_pr "$@" ;;
-        *) die "usage: bga github <repo|status|publish|compare|pr> [--open]" ;;
+        *) die "usage: bga github <repo|status|publish|submit|compare|pr> [--open]" ;;
       esac
       ;;
     cockpit) cmd_cockpit "$@" ;;
