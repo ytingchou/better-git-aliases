@@ -10,7 +10,7 @@ A practical Git CLI workflow for real work:
 
 This repo does not try to replace Git. It wraps a few high-value workflows so they are faster, more consistent, and easier to learn.
 
-Current version: `0.1.0`
+Current version: `0.1.1`
 
 License: [MIT](LICENSE)
 

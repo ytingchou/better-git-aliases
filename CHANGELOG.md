@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.1.1] - 2026-03-11
+
+### Added
+
+- Beginner-friendly day-to-day tutorial under `docs/day-to-day.md`
+- Lazygit-focused daily workflow guide and cheatsheet for new users
+
+### Changed
+
+- Removed hard-coded local home directory paths from Markdown documentation
+- Improved README shell integration examples to use generic paths
+
 ## [0.1.0] - 2026-03-11
 
 ### Added
