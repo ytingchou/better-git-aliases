@@ -954,9 +954,83 @@ EOF
   esac
 }
 
+prompt_input() {
+  local label="$1" value
+  printf '%s' "$label"
+  read -r value
+  printf '%s\n' "$value"
+}
+
+menu_prompt_feature_start() {
+  local name base
+  name="$(prompt_input 'feature name: ')"
+  [ -n "$name" ] || return 0
+  base="$(prompt_input "base branch [$(default_base_branch)]: ")"
+  if [ -n "$base" ]; then
+    cmd_feature_start "$name" "$base"
+  else
+    cmd_feature_start "$name"
+  fi
+}
+
+menu_prompt_resume_feature() {
+  local target action layout
+  target="$(resolve_worktree_path "${1:-}")"
+  [ -n "$target" ] || return 0
+  printf 'resume action:\n'
+  printf '  1. jump path only\n'
+  printf '  2. open lazygit\n'
+  printf '  3. open tmux cockpit\n'
+  action="$(prompt_input 'choose [1/2/3]: ')"
+  case "$action" in
+    1|"")
+      printf '%s\n' "$target"
+      ;;
+    2)
+      open_lazygit "$target"
+      ;;
+    3)
+      layout="$(prompt_input 'layout [solo]: ')"
+      open_tmux_workspace "$target" "${layout:-solo}"
+      ;;
+    *)
+      die "invalid choice: $action"
+      ;;
+  esac
+}
+
+menu_review_and_commit() {
+  if has lazygit; then
+    open_lazygit "."
+  else
+    printf 'lazygit is not installed. Showing git status instead.\n\n'
+    git status -sb
+    printf '\nTip: install lazygit for the best review workflow.\n'
+  fi
+}
+
+menu_cleanup_merged_work() {
+  local apply
+  printf 'cleanup preview:\n\n'
+  cmd_worktree_clean
+  printf '\n'
+  cmd_prune_merged
+  printf '\n'
+  apply="$(prompt_input 'apply stale worktree cleanup now? [y/N]: ')"
+  case "$apply" in
+    y|Y|yes|YES)
+      cmd_worktree_clean --apply
+      ;;
+  esac
+}
+
 run_menu_action() {
   local label="$1"
   case "$label" in
+    "Start a new feature") menu_prompt_feature_start ;;
+    "Resume existing feature") menu_prompt_resume_feature ;;
+    "Review and commit changes") menu_review_and_commit ;;
+    "Clean up merged work") menu_cleanup_merged_work ;;
     "Doctor") cmd_doctor ;;
     "Bootstrap dependencies") cmd_bootstrap ;;
     "Install lazygit config") cmd_lazygit_config install ;;
@@ -964,11 +1038,7 @@ run_menu_action() {
     "Sync current branch") cmd_sync ;;
     "Checkout recent branch") cmd_recent ;;
     "Browse commits") cmd_commits ;;
-    "Create feature worktree") 
-      printf 'feature name: '
-      read -r name
-      [ -n "$name" ] && cmd_feature_start "$name"
-      ;;
+    "Create feature worktree") menu_prompt_feature_start ;;
     "List worktrees") cmd_worktree_list ;;
     "Open worktree in lazygit") cmd_worktree_lazygit ;;
     "Open worktree cockpit (tmux)") cmd_worktree_tmux ;;
@@ -988,6 +1058,46 @@ Shows:
 - recommended tools
 - git include installation
 - shell helper status
+EOF
+      ;;
+    "Start a new feature")
+      cat <<'EOF'
+Guided feature setup.
+
+Prompts for:
+- feature name
+- optional base branch
+
+Then creates a dedicated feature branch and matching worktree.
+EOF
+      ;;
+    "Resume existing feature")
+      cat <<'EOF'
+Pick an existing worktree and continue working.
+
+Options:
+- print the path
+- open lazygit
+- open tmux cockpit
+EOF
+      ;;
+    "Review and commit changes")
+      cat <<'EOF'
+Open the safest review flow before commit.
+
+Behavior:
+- opens lazygit if available
+- otherwise falls back to git status with a hint
+EOF
+      ;;
+    "Clean up merged work")
+      cat <<'EOF'
+Preview stale managed worktrees and merged branches.
+
+Behavior:
+- shows a dry-run cleanup
+- lets you confirm managed worktree cleanup
+- also prunes merged local branches
 EOF
       ;;
     "Bootstrap dependencies")
@@ -1114,7 +1224,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Doctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nHelp'
+  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nClean up merged work\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \

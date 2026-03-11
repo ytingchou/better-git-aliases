@@ -157,6 +157,7 @@ Without `fzf`, the toolkit still works, but interactive pickers fall back to sim
 With `fzf`, these commands become much better:
 
 - `git menu`: command descriptions in a side preview
+- `git menu`: beginner-friendly task actions like starting a feature, resuming work, reviewing changes, and cleanup
 - `git recent`: branch picker with commit/log preview
 - `git wt ...`: worktree picker with status/log/file preview
 - `git commits`: patch preview while browsing history
@@ -268,7 +269,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git lazygit-config backup`: create a timestamped backup of your current config
 - `git lazygit-config merge-hint`: show a safe merge workflow for custom configs
 - `git workflow-help`: show all supported commands
-- `git menu`: open an interactive menu of common actions with descriptions
+- `git menu`: open an interactive task-oriented menu with descriptions
 - `git dash`: show repo status, worktrees, and recent branches
 
 ### Daily commands
@@ -322,6 +323,12 @@ git dash
 
 If you forget anything later, `git menu` is the recovery path. This is intentional: you should not need to memorize everything.
 If `fzf` is installed, `git menu` also shows a right-side description panel for each action.
+It now starts with task-oriented entries such as:
+
+- `Start a new feature`
+- `Resume existing feature`
+- `Review and commit changes`
+- `Clean up merged work`
 
 If `fzf`, `lazygit`, or `tmux` are missing:
 
