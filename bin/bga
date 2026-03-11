@@ -37,6 +37,26 @@ shell_helper_path() {
   printf '%s\n' "${BGA_ROOT}/shell/bga.sh"
 }
 
+managed_lazygit_template_path() {
+  if [ -f "${BGA_ROOT}/config/lazygit/config.yml" ]; then
+    printf '%s\n' "${BGA_ROOT}/config/lazygit/config.yml"
+    return 0
+  fi
+  asset_path "lazygit/template.yml"
+}
+
+managed_lazygit_config_path() {
+  printf '%s/.config/lazygit/config.yml\n' "${HOME}"
+}
+
+backup_root() {
+  printf '%s/.config/better-git-aliases/backups\n' "${HOME}"
+}
+
+timestamp() {
+  date '+%Y%m%d-%H%M%S'
+}
+
 die() {
   printf 'bga: %s\n' "$*" >&2
   exit 1
@@ -279,7 +299,7 @@ Core:
   bga help                      Show this help
   bga doctor                    Check environment and dependencies
   bga bootstrap [brew|apt]      Install recommended dependencies
-  bga lazygit-config install    Install curated lazygit config
+  bga lazygit-config <subcmd>   Manage curated lazygit config
   bga menu                      Show interactive workflow menu
   bga dashboard                 Show repo + worktree overview
   bga sync                      Fetch and rebase current branch
@@ -415,19 +435,66 @@ cmd_bootstrap() {
 cmd_lazygit_config() {
   local action="${1:-install}"
   local target_dir="${HOME}/.config/lazygit"
+  local target_file
   local source_file
-  source_file="$(asset_path "lazygit/template.yml")" || die "lazygit template not found; reinstall better-git-aliases"
+  source_file="$(managed_lazygit_template_path)" || die "lazygit template not found; reinstall better-git-aliases"
+  target_file="$(managed_lazygit_config_path)"
   case "$action" in
     install)
       mkdir -p "$target_dir"
-      install -m 0644 "$source_file" "${target_dir}/config.yml"
-      printf 'Installed lazygit config: %s\n' "${target_dir}/config.yml"
+      install -m 0644 "$source_file" "$target_file"
+      printf 'Installed lazygit config: %s\n' "$target_file"
       ;;
     path)
-      printf '%s\n' "${target_dir}/config.yml"
+      printf '%s\n' "$target_file"
+      ;;
+    diff)
+      if [ ! -f "$target_file" ]; then
+        die "lazygit config not found at $target_file"
+      fi
+      if command -v diff >/dev/null 2>&1; then
+        diff -u "$target_file" "$source_file" || true
+      else
+        die "diff command is not available"
+      fi
+      ;;
+    backup)
+      if [ ! -f "$target_file" ]; then
+        die "lazygit config not found at $target_file"
+      fi
+      local backup_dir backup_file
+      backup_dir="$(backup_root)/lazygit"
+      mkdir -p "$backup_dir"
+      backup_file="${backup_dir}/config.$(timestamp).yml"
+      cp "$target_file" "$backup_file"
+      printf 'Backed up lazygit config to: %s\n' "$backup_file"
+      ;;
+    merge-hint)
+      cat <<EOF
+Managed template:
+  $source_file
+
+Current lazygit config:
+  $target_file
+
+Recommended merge flow:
+  1. Back up your current config:
+     bga lazygit-config backup
+  2. Review differences:
+     bga lazygit-config diff
+  3. Keep your personal preferences and copy only the workflow-specific pieces:
+     - customCommands
+     - git.paging
+     - keybinding overrides you actually want
+  4. Re-install the managed version only if you want a full reset:
+     bga lazygit-config install
+
+Practical rule:
+  Treat the bundled config as a reference baseline, not something you must overwrite every time.
+EOF
       ;;
     *)
-      die "usage: bga lazygit-config <install|path>"
+      die "usage: bga lazygit-config <install|path|diff|backup|merge-hint>"
       ;;
   esac
 }

@@ -217,6 +217,15 @@ If you want to re-install that config later:
 git lazygit-config install
 ```
 
+Useful lazygit config management commands:
+
+```bash
+git lazygit-config path
+git lazygit-config diff
+git lazygit-config backup
+git lazygit-config merge-hint
+```
+
 ## Optional shell integration
 
 Git aliases cannot change your current shell directory. That matters for `worktree` workflows. To make jumping between worktrees ergonomic, add this to `~/.bashrc` or `~/.zshrc`:
@@ -246,6 +255,10 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git doctor`: check whether required/recommended tools are installed
 - `git bootstrap [brew|apt]`: install recommended dependencies
 - `git lazygit-config install`: install the bundled lazygit config
+- `git lazygit-config path`: print the active lazygit config path
+- `git lazygit-config diff`: compare your current config with the bundled template
+- `git lazygit-config backup`: create a timestamped backup of your current config
+- `git lazygit-config merge-hint`: show a safe merge workflow for custom configs
 - `git workflow-help`: show all supported commands
 - `git menu`: open an interactive menu of common actions with descriptions
 - `git dash`: show repo status, worktrees, and recent branches
@@ -391,6 +404,14 @@ The bundled lazygit config also adds workflow shortcuts:
 - `Ctrl-T`: open worktree picker in tmux mode
 
 If you use `delta`, lazygit diffs become much easier to scan. The config already prefers it when available.
+
+If you already have your own lazygit config and do not want a blind overwrite, use:
+
+```bash
+git lazygit-config backup
+git lazygit-config diff
+git lazygit-config merge-hint
+```
 
 ### 4.1 Lazygit daily routine
 
