@@ -331,6 +331,7 @@ Start here:
 git doctor
 git workflow-help
 git start-day
+git finish-day
 git menu
 git dash
 ```
@@ -348,6 +349,12 @@ If you want one command for the normal start-of-day routine:
 
 ```bash
 git start-day
+```
+
+And one for the end of the workday:
+
+```bash
+git finish-day
 ```
 
 If `fzf`, `lazygit`, or `tmux` are missing:
@@ -747,6 +754,12 @@ Or, if you want the pieces separately:
 ```bash
 git sync
 git dash
+```
+
+At the end of work:
+
+```bash
+git finish-day
 ```
 
 The newer `git dash` is opinionated on purpose. It tries to answer:

@@ -502,6 +502,7 @@ Core:
   bga lazygit-config <subcmd>   Manage curated lazygit config
   bga menu                      Show interactive workflow menu
   bga start-day                 Run doctor, sync, and dashboard in sequence
+  bga finish-day                Run pause summary and dashboard in sequence
   bga dashboard                 Show repo + worktree overview
   bga sync                      Fetch and rebase current branch
   bga review [status|diff]      Review current branch before commit/submit
@@ -558,6 +559,7 @@ Recommended git aliases after install:
   git bootstrap
   git lazygit-config
   git start-day
+  git finish-day
   git menu
   git dash
   git sync
@@ -770,6 +772,14 @@ cmd_start_day() {
   cmd_doctor || true
   printf '\n== sync ==\n'
   cmd_sync 2>&1
+  printf '\n== dashboard ==\n'
+  cmd_dashboard
+}
+
+cmd_finish_day() {
+  ensure_repo
+  printf '== pause ==\n'
+  cmd_feature_pause
   printf '\n== dashboard ==\n'
   cmd_dashboard
 }
@@ -1510,6 +1520,7 @@ run_menu_action() {
   local label="$1"
   case "$label" in
     "Start the workday") cmd_start_day ;;
+    "Finish the workday") cmd_finish_day ;;
     "Start a new feature") menu_prompt_feature_start ;;
     "Resume existing feature") menu_prompt_resume_feature ;;
     "Pause current feature") cmd_feature_pause ;;
@@ -1553,6 +1564,15 @@ Run the recommended start-of-day sequence.
 Includes:
 - doctor
 - sync
+- dashboard
+EOF
+      ;;
+    "Finish the workday")
+      cat <<'EOF'
+Run the recommended end-of-day sequence.
+
+Includes:
+- feature pause
 - dashboard
 EOF
       ;;
@@ -1791,7 +1811,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
+  items=$'Start the workday\nFinish the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \
@@ -1821,6 +1841,7 @@ main() {
     bootstrap) cmd_bootstrap "$@" ;;
     lazygit-config) cmd_lazygit_config "$@" ;;
     start-day) cmd_start_day "$@" ;;
+    finish-day) cmd_finish_day "$@" ;;
     menu) cmd_menu ;;
     dashboard|dash) cmd_dashboard ;;
     sync) cmd_sync ;;

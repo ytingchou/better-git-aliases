@@ -4,6 +4,7 @@
   lazygit-config = "!f() { \"$HOME/.local/bin/bga\" lazygit-config \"$@\"; }; f"
   workflow-help = "!\"$HOME/.local/bin/bga\" help"
   start-day = "!\"$HOME/.local/bin/bga\" start-day"
+  finish-day = "!\"$HOME/.local/bin/bga\" finish-day"
   menu = "!\"$HOME/.local/bin/bga\" menu"
   dash = "!\"$HOME/.local/bin/bga\" dashboard"
   sync = "!\"$HOME/.local/bin/bga\" sync"
