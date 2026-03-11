@@ -118,19 +118,37 @@ Goal:
 
 - make multi-repo work feel as guided as the single-repo menu
 
-Possible additions:
+Delivered:
 
 - `bga workspace menu`
 - pick repo then action
-- workspace-level recent repo picker
+- dashboard, sync, lazygit, cockpit, codex, cline, and path actions
 
-Why:
+Why it mattered:
 
 - once users manage several repos, discoverability matters again
 
+## Next
+
+### 8. Protected branch config
+
+Goal:
+
+- let teams define which local branches should never be touched by cleanup helpers
+
+Possible additions:
+
+- repo-level protected branch list in `.bga.env`
+- user override support
+- `prune-merged` and cleanup commands honoring that list
+
+Why:
+
+- branch cleanup should be opinionated, but not hard-coded to only a few branch names
+
 ## Later
 
-### 8. Provider abstraction
+### 9. Provider abstraction
 
 Goal:
 
@@ -145,7 +163,7 @@ Why:
 
 - useful, but not required for the main Git-native workflow
 
-### 9. Demo polish
+### 10. Demo polish
 
 Goal:
 

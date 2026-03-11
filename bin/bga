@@ -366,6 +366,49 @@ workspace_repo_worktree_count() {
   (cd "$path" && list_worktrees | awk 'NF { c++ } END { print c + 0 }')
 }
 
+list_workspace_repos() {
+  local root="${1:-$(workspace_root)}" repo branch dirty
+  while IFS= read -r repo; do
+    [ -n "$repo" ] || continue
+    branch="$(workspace_repo_branch "$repo")"
+    dirty='clean'
+    if repo_is_dirty "$repo"; then
+      dirty='dirty'
+    fi
+    printf '%s|%s|%s\n' "$repo" "${branch:-detached}" "$dirty"
+  done < <(workspace_repo_roots "$root")
+}
+
+workspace_repo_picker() {
+  local root="${1:-$(workspace_root)}"
+  if has fzf; then
+    list_workspace_repos "$root" | fzf \
+      --delimiter='|' \
+      --with-nth=2,3,1 \
+      --preview-window='right,65%,border-left' \
+      --height=85% \
+      --layout=reverse \
+      --border \
+      --prompt='repo> ' \
+      --header='branch | status | path' \
+      --preview '
+        path=$(printf "%s" {} | cut -d"|" -f1)
+        if [ -d "$path" ]; then
+          cd "$path" || exit 1
+          printf "Path: %s\n\n" "$path"
+          git status -sb
+          printf "\nRecent commits:\n"
+          git log --oneline --decorate -n 8
+          printf "\nWorktrees:\n"
+          git worktree list
+        fi
+      ' \
+      | cut -d'|' -f1
+  else
+    list_workspace_repos "$root" | column -t -s '|' | fzf_or_first "repo> " | awk '{print $1}'
+  fi
+}
+
 branch_upstream() {
   local branch="$1"
   git rev-parse --abbrev-ref --symbolic-full-name "${branch}@{upstream}" 2>/dev/null || true
@@ -655,8 +698,8 @@ Core:
   bga start-day                 Run doctor, sync, and dashboard in sequence
   bga finish-day                Run pause summary and dashboard in sequence
   bga dashboard                 Show repo + worktree overview
-  bga workspace <list|dash|sync> [ROOT]
-                                Show or sync repos under one workspace root
+  bga workspace <list|dash|sync|menu> [ROOT]
+                                Show, sync, or interact with repos under one workspace root
   bga sync                      Fetch and rebase current branch
   bga review [status|diff]      Review current branch before commit/submit
   bga recent                    Pick and checkout a recent branch
@@ -716,7 +759,7 @@ Recommended git aliases after install:
   git finish-day
   git menu
   git dash
-  git ws / git wsdash / git wssync
+  git ws / git wsdash / git wssync / git wsmenu
   git sync
   git recent
   git wt / git wta / git wtrm / git wttmux
@@ -1073,6 +1116,49 @@ cmd_workspace_sync() {
   done < <(workspace_repo_roots "$root")
 }
 
+cmd_workspace_action() {
+  local repo="${1:-}" action="${2:-dash}" layout
+  [ -n "$repo" ] || die "usage: bga workspace action <repo-path> <dash|sync|lazygit|cockpit|codex|cline|path>"
+  case "$action" in
+    dash) (cd "$repo" && "${BGA_BIN_DIR}/bga" dashboard) ;;
+    sync) (cd "$repo" && "${BGA_BIN_DIR}/bga" sync) ;;
+    lazygit) open_lazygit "$repo" ;;
+    cockpit)
+      layout="$(config_get cockpit_layout || true)"
+      open_tmux_workspace "$repo" "${layout:-solo}"
+      ;;
+    codex) open_ai_cli codex "$repo" ;;
+    cline) open_ai_cli cline "$repo" ;;
+    path) printf '%s\n' "$repo" ;;
+    *) die "usage: bga workspace action <repo-path> <dash|sync|lazygit|cockpit|codex|cline|path>" ;;
+  esac
+}
+
+cmd_workspace_menu() {
+  local root="${1:-$(workspace_root)}" repo action
+  repo="$(workspace_repo_picker "$root")"
+  [ -n "$repo" ] || return 0
+  printf 'workspace action:\n'
+  printf '  1. dashboard\n'
+  printf '  2. sync\n'
+  printf '  3. lazygit\n'
+  printf '  4. tmux cockpit\n'
+  printf '  5. codex\n'
+  printf '  6. cline\n'
+  printf '  7. print path\n'
+  action="$(prompt_input 'choose [1-7]: ')"
+  case "$action" in
+    1|"") cmd_workspace_action "$repo" dash ;;
+    2) cmd_workspace_action "$repo" sync ;;
+    3) cmd_workspace_action "$repo" lazygit ;;
+    4) cmd_workspace_action "$repo" cockpit ;;
+    5) cmd_workspace_action "$repo" codex ;;
+    6) cmd_workspace_action "$repo" cline ;;
+    7) cmd_workspace_action "$repo" path ;;
+    *) die "invalid choice: $action" ;;
+  esac
+}
+
 cmd_workspace() {
   local action="${1:-dash}"
   shift || true
@@ -1080,7 +1166,9 @@ cmd_workspace() {
     list) cmd_workspace_list "${1:-}" ;;
     dash) cmd_workspace_dash "${1:-}" ;;
     sync) cmd_workspace_sync "${1:-}" ;;
-    *) die "usage: bga workspace <list|dash|sync> [ROOT]" ;;
+    menu) cmd_workspace_menu "${1:-}" ;;
+    action) cmd_workspace_action "${1:-}" "${2:-}" ;;
+    *) die "usage: bga workspace <list|dash|sync|menu> [ROOT]" ;;
   esac
 }
 
@@ -1799,6 +1887,7 @@ run_menu_action() {
     "Clean up current feature after merge") cmd_feature_cleanup ;;
     "Clean up merged work") menu_cleanup_merged_work ;;
     "Workspace overview") cmd_workspace dash ;;
+    "Workspace action menu") cmd_workspace menu ;;
     "Sync all repos in workspace") cmd_workspace sync ;;
     "Doctor") cmd_doctor ;;
     "Configure defaults") cmd_config list ;;
@@ -1986,6 +2075,20 @@ Tip:
 - set a fixed root with: git config-bga set workspace_root /path/to/workspace
 EOF
       ;;
+    "Workspace action menu")
+      cat <<'EOF'
+Pick one repo from the workspace, then choose a focused action.
+
+Actions:
+- dashboard
+- sync
+- lazygit
+- tmux cockpit
+- codex
+- cline
+- print path
+EOF
+      ;;
     "Sync all repos in workspace")
       cat <<'EOF'
 Fetch all repos under the workspace root and rebase branches that already have an upstream.
@@ -2122,7 +2225,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start the workday\nFinish the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nWorkspace overview\nSync all repos in workspace\nDoctor\nConfigure defaults\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
+  items=$'Start the workday\nFinish the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nWorkspace overview\nWorkspace action menu\nSync all repos in workspace\nDoctor\nConfigure defaults\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \

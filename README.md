@@ -325,6 +325,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git ws list [root]`: list detected repos under the workspace root
 - `git wsdash [root]`: show branch, dirty state, upstream state, and worktree count across repos
 - `git wssync [root]`: fetch all repos in the workspace and rebase branches that already have an upstream
+- `git wsmenu [root]`: pick a repo first, then choose dashboard, sync, lazygit, cockpit, or AI actions
 
 ### Tool integration
 
@@ -785,6 +786,7 @@ If you work across several repos under one parent directory:
 
 ```bash
 git wsdash
+git wsmenu
 git wssync
 ```
 
