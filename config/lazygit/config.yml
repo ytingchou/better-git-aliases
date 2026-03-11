@@ -1,0 +1,110 @@
+gui:
+  border: rounded
+  showBottomLine: false
+  showCommandLog: false
+  showFileTree: true
+  expandFocusedSidePanel: true
+  nerdFontsVersion: "3"
+  theme:
+    activeBorderColor:
+      - cyan
+      - bold
+    inactiveBorderColor:
+      - white
+    searchingActiveBorderColor:
+      - yellow
+      - bold
+    optionsTextColor:
+      - blue
+    selectedLineBgColor:
+      - reverse
+    cherryPickedCommitBgColor:
+      - green
+    cherryPickedCommitFgColor:
+      - black
+    unstagedChangesColor:
+      - red
+    defaultFgColor:
+      - white
+
+git:
+  paging:
+    colorArg: always
+    pager: bash -lc 'if command -v delta >/dev/null 2>&1; then exec delta --dark --paging=never; else exec less -R; fi'
+
+update:
+  method: never
+
+refresher:
+  refreshInterval: 10
+  fetchInterval: 60
+
+notARepository: quit
+
+promptToReturnFromSubprocess: false
+
+os:
+  editPreset: nvim
+
+keybinding:
+  universal:
+    quit: "q"
+    quit-alt1: "<esc>"
+    return: "<c-g>"
+    edit: "e"
+    openFile: "o"
+    jumpToBlock: ["1", "2", "3", "4", "5"]
+    nextBlock-alt: "L"
+    prevBlock-alt: "H"
+    nextTab: "]"
+    prevTab: "["
+  status:
+    checkForUpdate: "u"
+  files:
+    commitChanges: "C"
+    commitChangesWithoutHook: "w"
+    amendLastCommit: "A"
+    ignoreFile: "i"
+    refreshFiles: "R"
+    stashAllChanges: "S"
+    viewStashOptions: "s"
+  branches:
+    createPullRequest: "p"
+    viewPullRequestOptions: "P"
+    checkoutBranchByName: "<c-f>"
+    forceCheckoutBranch: "W"
+  commits:
+    moveDownCommit: "<c-n>"
+    moveUpCommit: "<c-p>"
+
+customCommands:
+  - key: "<c-w>"
+    context: "global"
+    description: "Open worktree cockpit in tmux"
+    command: "bga cockpit"
+    subprocess: true
+  - key: "<c-o>"
+    context: "global"
+    description: "Open Codex in current repo/worktree"
+    command: "bga codex"
+    subprocess: true
+  - key: "<c-y>"
+    context: "global"
+    description: "Open Cline in current repo/worktree"
+    command: "bga cline"
+    subprocess: true
+  - key: "<c-r>"
+    context: "global"
+    description: "Sync current branch"
+    command: "bga sync"
+    subprocess: true
+  - key: "<c-b>"
+    context: "global"
+    description: "Checkout recent branch"
+    command: "bga recent"
+    subprocess: true
+  - key: "<c-t>"
+    context: "global"
+    description: "Open selected worktree in tmux"
+    command: "bga worktree tmux"
+    subprocess: true

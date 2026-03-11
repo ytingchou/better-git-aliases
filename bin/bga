@@ -1,0 +1,796 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BGA_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BGA_ROOT="$(cd "${BGA_BIN_DIR}/.." && pwd)"
+
+has() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+config_home() {
+  printf '%s/.config/better-git-aliases\n' "${HOME}"
+}
+
+asset_path() {
+  local rel="$1"
+  if [ -f "${BGA_ROOT}/${rel}" ]; then
+    printf '%s\n' "${BGA_ROOT}/${rel}"
+    return 0
+  fi
+  if [ -f "$(config_home)/${rel}" ]; then
+    printf '%s\n' "$(config_home)/${rel}"
+    return 0
+  fi
+  return 1
+}
+
+shell_helper_path() {
+  if [ -f "${BGA_ROOT}/shell/bga.sh" ]; then
+    printf '%s\n' "${BGA_ROOT}/shell/bga.sh"
+    return 0
+  fi
+  if [ -f "$(config_home)/shell/bga.sh" ]; then
+    printf '%s\n' "$(config_home)/shell/bga.sh"
+    return 0
+  fi
+  printf '%s\n' "${BGA_ROOT}/shell/bga.sh"
+}
+
+die() {
+  printf 'bga: %s\n' "$*" >&2
+  exit 1
+}
+
+repo_root() {
+  git rev-parse --show-toplevel 2>/dev/null
+}
+
+repo_name() {
+  basename "$(repo_root)"
+}
+
+current_branch() {
+  git branch --show-current 2>/dev/null || true
+}
+
+default_base_branch() {
+  if git show-ref --verify --quiet refs/heads/main; then
+    printf 'main\n'
+  elif git show-ref --verify --quiet refs/heads/master; then
+    printf 'master\n'
+  else
+    git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || printf 'main\n'
+  fi
+}
+
+worktree_root() {
+  local root name parent
+  root="$(repo_root)"
+  name="$(basename "$root")"
+  parent="$(dirname "$root")"
+  printf '%s/.worktrees/%s\n' "$parent" "$name"
+}
+
+ensure_repo() {
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not inside a git repository"
+}
+
+require_clean_or_confirm() {
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    printf 'warning: working tree has uncommitted changes\n' >&2
+  fi
+}
+
+fzf_or_first() {
+  local prompt="${1:-select> }"
+  if has fzf; then
+    fzf --height=80% --layout=reverse --border --prompt="$prompt"
+  else
+    head -n 1
+  fi
+}
+
+list_branches() {
+  git for-each-ref \
+    --sort=-committerdate \
+    --format='%(refname:short)|%(committerdate:relative)|%(authorname)|%(subject)' \
+    refs/heads refs/remotes
+}
+
+branch_picker() {
+  if has fzf; then
+    list_branches | fzf \
+      --delimiter='|' \
+      --with-nth=1,2,3,4 \
+      --preview-window='right,65%,border-left' \
+      --height=85% \
+      --layout=reverse \
+      --border \
+      --prompt='branch> ' \
+      --header='branch | updated | author | subject' \
+      --preview '
+        branch=$(printf "%s" {} | cut -d"|" -f1)
+        branch=${branch#origin/}
+        git log --color=always --decorate --stat -n 12 "$branch"
+      ' \
+      | cut -d'|' -f1
+  else
+    list_branches | column -t -s '|' | fzf_or_first "branch> " | awk '{print $1}'
+  fi
+}
+
+list_worktrees() {
+  git worktree list --porcelain | awk '
+    /^worktree / { path=$2 }
+    /^branch / { branch=$2; sub("refs/heads/", "", branch) }
+    /^HEAD / && branch == "" { branch="detached" }
+    /^$/ {
+      if (path != "") print path "|" branch
+      path=""
+      branch=""
+    }'
+}
+
+worktree_picker() {
+  if has fzf; then
+    list_worktrees | fzf \
+      --delimiter='|' \
+      --with-nth=2,1 \
+      --preview-window='right,65%,border-left' \
+      --height=85% \
+      --layout=reverse \
+      --border \
+      --prompt='worktree> ' \
+      --header='branch | path' \
+      --preview '
+        path=$(printf "%s" {} | cut -d"|" -f1)
+        if [ -d "$path" ]; then
+          cd "$path" || exit 1
+          printf "Path: %s\n\n" "$path"
+          git status -sb
+          printf "\nRecent commits:\n"
+          git log --oneline --decorate -n 10
+          printf "\nFiles:\n"
+          find . -maxdepth 2 -type f | sed "s#^\./##" | sort | head -n 40
+        fi
+      ' \
+      | cut -d'|' -f1
+  else
+    list_worktrees | column -t -s '|' | fzf_or_first "worktree> " | awk '{print $1}'
+  fi
+}
+
+open_lazygit() {
+  local target="${1:-.}"
+  has lazygit || die "lazygit is not installed"
+  (cd "$target" && lazygit)
+}
+
+open_ai_cli() {
+  local tool="$1"
+  local target="${2:-.}"
+  has "$tool" || die "$tool is not installed"
+  (cd "$target" && "$tool")
+}
+
+open_tmux_workspace() {
+  local target="${1:-.}"
+  local session="${2:-$(basename "$target")}"
+  has tmux || die "tmux is not installed"
+
+  if tmux has-session -t "$session" 2>/dev/null; then
+    exec tmux attach -t "$session"
+  fi
+
+  tmux new-session -d -s "$session" -c "$target" -n editor
+  tmux rename-window -t "$session:editor" 'shell'
+  tmux new-window -t "$session" -c "$target" -n git
+
+  if has lazygit; then
+    tmux send-keys -t "$session:git" 'lazygit' C-m
+  else
+    tmux send-keys -t "$session:git" 'git status -sb' C-m
+  fi
+
+  if has codex; then
+    tmux new-window -t "$session" -c "$target" -n codex
+    tmux send-keys -t "$session:codex" 'codex' C-m
+  elif has cline; then
+    tmux new-window -t "$session" -c "$target" -n cline
+    tmux send-keys -t "$session:cline" 'cline' C-m
+  fi
+
+  exec tmux attach -t "$session"
+}
+
+cmd_help() {
+  cat <<'EOF'
+better-git-aliases
+
+Core:
+  bga help                      Show this help
+  bga doctor                    Check environment and dependencies
+  bga bootstrap [brew|apt]      Install recommended dependencies
+  bga lazygit-config install    Install curated lazygit config
+  bga menu                      Show interactive workflow menu
+  bga dashboard                 Show repo + worktree overview
+  bga sync                      Fetch and rebase current branch
+  bga recent                    Pick and checkout a recent branch
+  bga commits                   Browse commits with preview
+  bga prune-merged              Delete merged local branches safely
+
+Feature workflow:
+  bga feature start NAME [BASE] Create branch + worktree
+  bga feature ship              Status checklist before push/merge
+
+Worktree workflow:
+  bga worktree list             List worktrees
+  bga worktree add NAME [BASE]  Create a new worktree for a branch
+  bga worktree path [QUERY]     Print selected worktree path
+  bga worktree remove [QUERY]   Remove a worktree
+  bga worktree tmux [QUERY]     Open selected worktree in tmux
+  bga worktree lazygit [QUERY]  Open selected worktree in lazygit
+
+Tool integrations:
+  bga lazygit [QUERY]           Open current or chosen worktree in lazygit
+  bga codex [QUERY]             Run codex in current or chosen worktree
+  bga cline [QUERY]             Run cline in current or chosen worktree
+  bga cockpit [QUERY]           Open tmux session with git + AI panes
+
+Shell integration:
+  bga init bash
+  bga init zsh
+
+Recommended git aliases after install:
+  git doctor
+  git bootstrap
+  git lazygit-config
+  git menu
+  git dash
+  git sync
+  git recent
+  git wt / git wta / git wtrm / git wttmux
+  git feature
+  git lg / git codex / git cline / git cockpit
+EOF
+}
+
+cmd_doctor() {
+  local missing=0
+  printf 'better-git-aliases doctor\n\n'
+  printf 'core:\n'
+  for tool in git bash; do
+    if has "$tool"; then
+      printf '  [ok]   %s -> %s\n' "$tool" "$(command -v "$tool")"
+    else
+      printf '  [miss] %s\n' "$tool"
+      missing=1
+    fi
+  done
+
+  printf '\nrecommended:\n'
+  for tool in fzf lazygit tmux delta codex cline; do
+    if has "$tool"; then
+      printf '  [ok]   %s -> %s\n' "$tool" "$(command -v "$tool")"
+    else
+      printf '  [skip] %s\n' "$tool"
+    fi
+  done
+
+  printf '\ngit include:\n'
+  if git config --global --get-all include.path 2>/dev/null | grep -Fqx "$(config_home)/gitconfig.include"; then
+    printf '  [ok]   %s\n' "$(config_home)/gitconfig.include"
+  else
+    printf '  [miss] %s\n' "$(config_home)/gitconfig.include"
+  fi
+
+  printf '\nshell helpers:\n'
+  if [ -n "${BGA_SHELL_LOADED:-}" ]; then
+    printf '  [ok]   current shell already sourced bga.sh\n'
+  elif [ -f "$(shell_helper_path)" ]; then
+    printf '  [info] source %s to enable gwt/gcodex/gcline/gcockpit\n' "$(shell_helper_path)"
+  else
+    printf '  [miss] shell helper file not found\n'
+  fi
+
+  printf '\nlazygit config:\n'
+  if [ -f "${HOME}/.config/lazygit/config.yml" ]; then
+    printf '  [ok]   %s\n' "${HOME}/.config/lazygit/config.yml"
+  else
+    printf '  [info] run: bga lazygit-config install\n'
+  fi
+
+  printf '\nembedded assets:\n'
+  if asset_path "lazygit/template.yml" >/dev/null 2>&1; then
+    printf '  [ok]   %s\n' "$(asset_path "lazygit/template.yml")"
+  else
+    printf '  [miss] lazygit template not found\n'
+  fi
+
+  [ "$missing" -eq 0 ] || return 1
+}
+
+cmd_bootstrap() {
+  local manager="${1:-auto}"
+  if [ "$manager" = "auto" ]; then
+    if has brew; then
+      manager="brew"
+    elif has apt-get; then
+      manager="apt"
+    else
+      die "no supported package manager found; use brew or apt explicitly"
+    fi
+  fi
+
+  case "$manager" in
+    brew)
+      has brew || die "brew is not installed"
+      brew install git fzf lazygit tmux git-delta
+      ;;
+    apt)
+      has apt-get || die "apt-get is not installed"
+      sudo apt-get update
+      sudo apt-get install -y git fzf tmux git-delta
+      if ! has lazygit; then
+        printf 'lazygit is not in standard apt repos on many systems; install it separately if needed.\n'
+      fi
+      ;;
+    *)
+      die "supported package managers: brew, apt"
+      ;;
+  esac
+}
+
+cmd_lazygit_config() {
+  local action="${1:-install}"
+  local target_dir="${HOME}/.config/lazygit"
+  local source_file
+  source_file="$(asset_path "lazygit/template.yml")" || die "lazygit template not found; reinstall better-git-aliases"
+  case "$action" in
+    install)
+      mkdir -p "$target_dir"
+      install -m 0644 "$source_file" "${target_dir}/config.yml"
+      printf 'Installed lazygit config: %s\n' "${target_dir}/config.yml"
+      ;;
+    path)
+      printf '%s\n' "${target_dir}/config.yml"
+      ;;
+    *)
+      die "usage: bga lazygit-config <install|path>"
+      ;;
+  esac
+}
+
+cmd_dashboard() {
+  ensure_repo
+  local root branch
+  root="$(repo_root)"
+  branch="$(current_branch)"
+  printf 'repo:      %s\n' "$root"
+  printf 'branch:    %s\n' "${branch:-detached}"
+  printf 'status:\n'
+  git status -sb
+  printf '\nworktrees:\n'
+  list_worktrees | column -t -s '|'
+  printf '\nrecent branches:\n'
+  list_branches | head -n 8 | column -t -s '|'
+}
+
+cmd_sync() {
+  ensure_repo
+  local branch upstream
+  branch="$(current_branch)"
+  [ -n "$branch" ] || die "detached HEAD; checkout a branch first"
+  git fetch --all --prune
+  upstream="$(git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" 2>/dev/null || true)"
+  if [ -n "$upstream" ]; then
+    git pull --rebase --autostash
+  else
+    printf 'No upstream set for %s. Fetched remotes only.\n' "$branch"
+  fi
+}
+
+cmd_recent() {
+  ensure_repo
+  local selected
+  selected="$(branch_picker)"
+  [ -n "${selected:-}" ] || exit 0
+  git checkout "${selected#origin/}"
+}
+
+cmd_commits() {
+  ensure_repo
+  if has fzf; then
+    git log --graph --color=always \
+      --pretty=format:'%C(auto)%h%d %s %C(black)%C(bold)%cr %C(auto)<%an>' \
+      --abbrev-commit \
+      | fzf --ansi --no-sort --reverse --tiebreak=index \
+          --height=85% \
+          --border \
+          --preview-window='right,65%,border-left' \
+          --preview 'echo {} | grep -o "[a-f0-9]\{7,\}" | head -n1 | xargs -r git show --color=always --stat --patch' \
+          --prompt='commit> '
+  else
+    git log --oneline --decorate -n 30
+  fi
+}
+
+cmd_prune_merged() {
+  ensure_repo
+  local protected current
+  current="$(current_branch)"
+  protected="main|master|develop|dev|${current}"
+  git branch --merged \
+    | sed 's/^[* ]*//' \
+    | grep -Ev "^(${protected})$" \
+    | awk 'NF' \
+    | while read -r branch; do
+        git branch -d "$branch"
+      done
+}
+
+cmd_feature_start() {
+  ensure_repo
+  local name base branch target_root target_path
+  name="${1:-}"
+  base="${2:-$(default_base_branch)}"
+  [ -n "$name" ] || die "usage: bga feature start <name> [base]"
+  branch="feature/${name}"
+  target_root="$(worktree_root)"
+  target_path="${target_root}/${branch//\//-}"
+
+  mkdir -p "$target_root"
+  git fetch --all --prune
+
+  if git show-ref --verify --quiet "refs/heads/${branch}"; then
+    git worktree add "$target_path" "$branch"
+  else
+    git worktree add -b "$branch" "$target_path" "$base"
+  fi
+
+  printf '%s\n' "$target_path"
+}
+
+cmd_feature_ship() {
+  ensure_repo
+  local branch
+  branch="$(current_branch)"
+  printf 'Branch: %s\n' "${branch:-detached}"
+  printf '\nStatus:\n'
+  git status -sb
+  printf '\nAhead/behind:\n'
+  git rev-list --left-right --count HEAD..."@{upstream}" 2>/dev/null || printf 'no upstream\n'
+  printf '\nRecent commits:\n'
+  git log --oneline -n 5
+}
+
+cmd_worktree_list() {
+  ensure_repo
+  list_worktrees | column -t -s '|'
+}
+
+resolve_worktree_path() {
+  ensure_repo
+  local query="${1:-}"
+  if [ -n "$query" ] && [ -d "$query" ]; then
+    printf '%s\n' "$query"
+    return 0
+  fi
+
+  if [ -n "$query" ]; then
+    local match
+    match="$(list_worktrees | grep -E "${query}" | head -n 1 | cut -d'|' -f1 || true)"
+    [ -n "$match" ] && printf '%s\n' "$match" && return 0
+  fi
+
+  worktree_picker
+}
+
+cmd_worktree_add() {
+  ensure_repo
+  local name="${1:-}" base="${2:-$(default_base_branch)}" branch target_root target_path
+  [ -n "$name" ] || die "usage: bga worktree add <branch-or-name> [base]"
+  branch="$name"
+  target_root="$(worktree_root)"
+  target_path="${target_root}/${branch//\//-}"
+  mkdir -p "$target_root"
+  git fetch --all --prune
+
+  if git show-ref --verify --quiet "refs/heads/${branch}"; then
+    git worktree add "$target_path" "$branch"
+  else
+    git worktree add -b "$branch" "$target_path" "$base"
+  fi
+
+  printf '%s\n' "$target_path"
+}
+
+cmd_worktree_path() {
+  local selected
+  selected="$(resolve_worktree_path "${1:-}")"
+  [ -n "${selected:-}" ] || exit 0
+  printf '%s\n' "$selected"
+}
+
+cmd_worktree_remove() {
+  ensure_repo
+  local target
+  target="$(resolve_worktree_path "${1:-}")"
+  [ -n "${target:-}" ] || exit 0
+  git worktree remove "$target"
+}
+
+cmd_worktree_tmux() {
+  local target
+  target="$(resolve_worktree_path "${1:-}")"
+  [ -n "${target:-}" ] || exit 0
+  open_tmux_workspace "$target" "$(basename "$target")"
+}
+
+cmd_worktree_lazygit() {
+  local target
+  target="$(resolve_worktree_path "${1:-}")"
+  [ -n "${target:-}" ] || exit 0
+  open_lazygit "$target"
+}
+
+cmd_lazygit() {
+  if [ $# -gt 0 ]; then
+    cmd_worktree_lazygit "$1"
+  else
+    open_lazygit "."
+  fi
+}
+
+cmd_codex() {
+  local target="."
+  [ $# -gt 0 ] && target="$(resolve_worktree_path "$1")"
+  open_ai_cli codex "$target"
+}
+
+cmd_cline() {
+  local target="."
+  [ $# -gt 0 ] && target="$(resolve_worktree_path "$1")"
+  open_ai_cli cline "$target"
+}
+
+cmd_cockpit() {
+  local target="."
+  [ $# -gt 0 ] && target="$(resolve_worktree_path "$1")"
+  open_tmux_workspace "$target" "git-$(basename "$target")"
+}
+
+cmd_init() {
+  local shell_name="${1:-bash}"
+  local helper
+  helper="$(shell_helper_path)"
+  case "$shell_name" in
+    bash|zsh)
+      cat <<EOF
+source "${helper}"
+EOF
+      ;;
+    *)
+      die "supported shells: bash, zsh"
+      ;;
+  esac
+}
+
+run_menu_action() {
+  local label="$1"
+  case "$label" in
+    "Doctor") cmd_doctor ;;
+    "Bootstrap dependencies") cmd_bootstrap ;;
+    "Install lazygit config") cmd_lazygit_config install ;;
+    "Dashboard") cmd_dashboard ;;
+    "Sync current branch") cmd_sync ;;
+    "Checkout recent branch") cmd_recent ;;
+    "Browse commits") cmd_commits ;;
+    "Create feature worktree") 
+      printf 'feature name: '
+      read -r name
+      [ -n "$name" ] && cmd_feature_start "$name"
+      ;;
+    "List worktrees") cmd_worktree_list ;;
+    "Open worktree in lazygit") cmd_worktree_lazygit ;;
+    "Open worktree cockpit (tmux)") cmd_worktree_tmux ;;
+    "Prune merged branches") cmd_prune_merged ;;
+    "Help") cmd_help ;;
+  esac
+}
+
+menu_preview() {
+  case "$1" in
+    "Doctor")
+      cat <<'EOF'
+Check whether the local environment is ready.
+
+Shows:
+- required tools
+- recommended tools
+- git include installation
+- shell helper status
+EOF
+      ;;
+    "Bootstrap dependencies")
+      cat <<'EOF'
+Install recommended dependencies.
+
+Supported:
+- brew
+- apt
+
+Use this on a fresh machine before relying on menu, fzf, tmux, or lazygit workflows.
+EOF
+      ;;
+    "Install lazygit config")
+      cat <<'EOF'
+Install the curated lazygit config for this workflow.
+
+Includes:
+- cleaner UI defaults
+- git pager via delta
+- shortcuts for bga/tmux/codex/cline flows
+EOF
+      ;;
+    "Dashboard")
+      cat <<'EOF'
+Repo summary for quick orientation.
+
+Shows:
+- current repo root
+- current branch
+- git status
+- worktrees
+- recent branches
+EOF
+      ;;
+    "Sync current branch")
+      cat <<'EOF'
+Fetch remotes and rebase current branch if it has an upstream.
+
+Good start-of-day command.
+EOF
+      ;;
+    "Checkout recent branch")
+      cat <<'EOF'
+Open a fuzzy branch picker.
+
+Preview:
+- recent commits
+- stats
+- decorations
+EOF
+      ;;
+    "Browse commits")
+      cat <<'EOF'
+Open commit history with patch preview.
+
+Useful for:
+- reviewing recent work
+- copying commit hashes
+- understanding branch history
+EOF
+      ;;
+    "Create feature worktree")
+      cat <<'EOF'
+Create a new feature branch and matching worktree.
+
+Pattern:
+- branch: feature/<name>
+- path: ../.worktrees/<repo>/feature-<name>
+EOF
+      ;;
+    "List worktrees")
+      cat <<'EOF'
+Show all worktrees attached to the current repo.
+
+Use this when juggling multiple features.
+EOF
+      ;;
+    "Open worktree in lazygit")
+      cat <<'EOF'
+Select a worktree and launch lazygit inside it.
+
+Best for:
+- staging hunks
+- reviewing diffs
+- branch and stash inspection
+EOF
+      ;;
+    "Open worktree cockpit (tmux)")
+      cat <<'EOF'
+Select a worktree and open a tmux session around it.
+
+Typical windows:
+- shell
+- git/lazygit
+- codex or cline
+EOF
+      ;;
+    "Prune merged branches")
+      cat <<'EOF'
+Delete merged local branches, excluding protected names.
+
+Protected by default:
+- main
+- master
+- develop
+- dev
+- current branch
+EOF
+      ;;
+    "Help")
+      cat <<'EOF'
+Show the full command reference.
+EOF
+      ;;
+  esac
+}
+
+cmd_menu() {
+  local items selected
+  items=$'Doctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nHelp'
+  if has fzf; then
+    selected="$(printf '%s\n' "$items" | fzf \
+      --height=80% \
+      --layout=reverse \
+      --border \
+      --preview-window='right,55%,border-left,wrap' \
+      --prompt='menu> ' \
+      --header='better-git-aliases menu' \
+      --preview "\"${BGA_BIN_DIR}/bga\" __menu-preview {}" )"
+  else
+    printf '%s\n' "$items"
+    printf 'select exactly one label: '
+    read -r selected
+  fi
+  [ -n "${selected:-}" ] || exit 0
+  run_menu_action "$selected"
+}
+
+main() {
+  local cmd="${1:-help}"
+  shift || true
+
+  case "$cmd" in
+    __menu-preview) menu_preview "${1:-}" ;;
+    help|-h|--help) cmd_help ;;
+    doctor) cmd_doctor ;;
+    bootstrap) cmd_bootstrap "$@" ;;
+    lazygit-config) cmd_lazygit_config "$@" ;;
+    menu) cmd_menu ;;
+    dashboard|dash) cmd_dashboard ;;
+    sync) cmd_sync ;;
+    recent) cmd_recent ;;
+    commits) cmd_commits ;;
+    prune-merged) cmd_prune_merged ;;
+    feature)
+      case "${1:-}" in
+        start) shift; cmd_feature_start "$@" ;;
+        ship) shift; cmd_feature_ship "$@" ;;
+        *) die "usage: bga feature <start|ship> ..." ;;
+      esac
+      ;;
+    worktree|wt)
+      case "${1:-list}" in
+        list) shift; cmd_worktree_list "$@" ;;
+        add) shift; cmd_worktree_add "$@" ;;
+        path) shift; cmd_worktree_path "$@" ;;
+        remove|rm) shift; cmd_worktree_remove "$@" ;;
+        tmux) shift; cmd_worktree_tmux "$@" ;;
+        lazygit|lg) shift; cmd_worktree_lazygit "$@" ;;
+        *) die "usage: bga worktree <list|add|path|remove|tmux|lazygit> ..." ;;
+      esac
+      ;;
+    lazygit|lg) cmd_lazygit "$@" ;;
+    codex) cmd_codex "$@" ;;
+    cline) cmd_cline "$@" ;;
+    cockpit) cmd_cockpit "$@" ;;
+    init) cmd_init "$@" ;;
+    *) die "unknown command: $cmd" ;;
+  esac
+}
+
+main "$@"

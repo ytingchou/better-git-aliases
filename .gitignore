@@ -1,0 +1,11 @@
+# Editor / OS
+.DS_Store
+Thumbs.db
+
+# Shell / local scratch
+*.swp
+*.swo
+*~
+
+# Repo-local test artifacts
+tmp/
