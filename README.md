@@ -283,6 +283,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 
 - `git feature start <name> [base]`: create `feature/<name>` and a dedicated worktree
 - `git feature ship`: quick pre-push checklist for the current branch
+- `git feature submit [base]`: show ship summary, then publish the branch
 - `git feature finish [branch] [--base base]`: remove merged managed worktrees and try to delete the local branch
 
 ### Worktree workflow
@@ -301,12 +302,12 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git lg [query]`: open `lazygit` in current or selected worktree
 - `git codex [query]`: run `codex` in current or selected worktree
 - `git cline [query]`: run `cline` in current or selected worktree
-- `git ghrepo [--open]`: print or open the GitHub repo URL
-- `git ghstatus [base]`: show branch publish state plus compare/PR URLs
-- `git ghpublish`: push the current branch and set upstream if needed
-- `git ghsubmit [base] [--open]`: publish the current branch, then print or open the PR URL
-- `git ghcompare [base] [--open]`: print or open the compare URL for the current branch
-- `git ghpr [base] [--open]`: print or open the new PR URL for the current branch
+- `git ghrepo [--open]`: optional GitHub-specific helper to print or open the repo URL
+- `git ghstatus [base]`: optional GitHub-specific helper to show branch publish state plus compare/PR URLs
+- `git ghpublish`: optional GitHub-specific helper to push the current branch and set upstream if needed
+- `git ghsubmit [base] [--open]`: optional GitHub-specific helper to publish the current branch, then print or open the PR URL
+- `git ghcompare [base] [--open]`: optional GitHub-specific helper to print or open the compare URL for the current branch
+- `git ghpr [base] [--open]`: optional GitHub-specific helper to print or open the new PR URL for the current branch
 - `git cockpit [query]`: create/attach a tmux session with shell + git + AI windows
 - `git cockpit list-layouts`: show available tmux cockpit layouts
 - `git cockpit [query] --layout <solo|review|ai-pair|multi-feature>`: choose a cockpit layout explicitly
@@ -602,6 +603,18 @@ Suggested pattern:
 - one AI CLI per session when needed
 
 This keeps prompts and local file context isolated by feature.
+
+When a feature is ready for review:
+
+```bash
+git feature submit
+```
+
+That flow:
+
+- shows the `feature ship` summary
+- publishes the branch if needed
+- tells you to open your Git hosting web UI and create the PR/MR there
 
 Available cockpit layouts:
 

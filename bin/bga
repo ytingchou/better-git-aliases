@@ -510,6 +510,7 @@ Core:
 Feature workflow:
   bga feature start NAME [BASE] Create branch + worktree
   bga feature ship              Status checklist before push/merge
+  bga feature submit [BASE]     Show ship summary, then publish the branch
   bga feature finish [BRANCH] [--base BASE]
                                 Clean up merged feature branch + worktree
 
@@ -859,6 +860,27 @@ cmd_feature_ship() {
   git rev-list --left-right --count HEAD..."@{upstream}" 2>/dev/null || printf 'no upstream\n'
   printf '\nRecent commits:\n'
   git log --oneline -n 5
+}
+
+cmd_feature_submit() {
+  ensure_repo
+  local base="" branch
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      *) base="$1" ;;
+    esac
+    shift || true
+  done
+  branch="$(current_branch)"
+  [ -n "$branch" ] || die "detached HEAD; checkout a branch first"
+  [ -n "$base" ] || base="$(default_base_branch)"
+
+  cmd_feature_ship
+  printf '\nSubmit flow:\n'
+  cmd_github_publish
+  printf '\nNext:\n'
+  printf '  - open your Git hosting web UI\n'
+  printf '  - create a PR/MR from %s to %s\n' "$branch" "$base"
 }
 
 cmd_feature_finish() {
@@ -1315,12 +1337,8 @@ run_menu_action() {
     "Start a new feature") menu_prompt_feature_start ;;
     "Resume existing feature") menu_prompt_resume_feature ;;
     "Review and commit changes") menu_review_and_commit ;;
+    "Submit current feature for review") cmd_feature_submit ;;
     "Clean up merged work") menu_cleanup_merged_work ;;
-    "Show GitHub status for current branch") cmd_github_status ;;
-    "Publish current branch to GitHub") cmd_github_publish ;;
-    "Publish branch and open PR flow") cmd_github_submit --open ;;
-    "Open GitHub compare for current branch") cmd_github_compare --open ;;
-    "Open GitHub PR page for current branch") cmd_github_pr --open ;;
     "Doctor") cmd_doctor ;;
     "Bootstrap dependencies") cmd_bootstrap ;;
     "Install lazygit config") cmd_lazygit_config install ;;
@@ -1350,53 +1368,6 @@ Shows:
 - shell helper status
 EOF
       ;;
-    "Open GitHub compare for current branch")
-      cat <<'EOF'
-Open the GitHub compare page for the current branch.
-
-Useful before:
-- creating a PR
-- checking the final diff
-- sharing a review URL
-EOF
-      ;;
-    "Show GitHub status for current branch")
-      cat <<'EOF'
-Show publish/review context for the current branch.
-
-Includes:
-- repo URL
-- branch and base
-- upstream/publish state
-- compare URL
-- PR URL
-EOF
-      ;;
-    "Publish current branch to GitHub")
-      cat <<'EOF'
-Push the current branch to origin.
-
-Behavior:
-- if the branch already has an upstream, run a normal push
-- otherwise push with -u to set upstream tracking
-EOF
-      ;;
-    "Publish branch and open PR flow")
-      cat <<'EOF'
-Push the current branch first, then open the GitHub PR page.
-
-Good when:
-- the branch is ready for review
-- you want one command from local work to PR creation
-EOF
-      ;;
-    "Open GitHub PR page for current branch")
-      cat <<'EOF'
-Open the GitHub new-PR page for the current branch.
-
-Uses the current branch and the default base branch unless you specify another base manually in CLI usage.
-EOF
-      ;;
     "Start a new feature")
       cat <<'EOF'
 Guided feature setup.
@@ -1406,6 +1377,56 @@ Prompts for:
 - optional base branch
 
 Then creates a dedicated feature branch and matching worktree.
+EOF
+      ;;
+    "Submit current feature for review")
+      cat <<'EOF'
+Show the feature ship summary, then publish the branch.
+
+Good when:
+- local work is ready for review
+- you want one command from final check to published branch
+- your team opens PRs/MRs directly in the web UI
+EOF
+      ;;
+    "Show GitHub status for current branch")
+      cat <<'EOF'
+Optional helper for GitHub-based workflows.
+
+Shows:
+- repo URL
+- branch and base
+- upstream/publish state
+- compare URL
+- PR URL
+EOF
+      ;;
+    "Publish current branch to GitHub")
+      cat <<'EOF'
+Optional helper for GitHub-based workflows.
+
+Push the current branch to origin.
+EOF
+      ;;
+    "Publish branch and open PR flow")
+      cat <<'EOF'
+Optional helper for GitHub-based workflows.
+
+Push the current branch first, then open the GitHub PR page.
+EOF
+      ;;
+    "Open GitHub compare for current branch")
+      cat <<'EOF'
+Optional helper for GitHub-based workflows.
+
+Open the GitHub compare page for the current branch.
+EOF
+      ;;
+    "Open GitHub PR page for current branch")
+      cat <<'EOF'
+Optional helper for GitHub-based workflows.
+
+Open the GitHub new-PR page for the current branch.
 EOF
       ;;
     "Resume existing feature")
@@ -1561,7 +1582,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nClean up merged work\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nHelp'
+  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nSubmit current feature for review\nClean up merged work\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \
@@ -1600,8 +1621,9 @@ main() {
       case "${1:-}" in
         start) shift; cmd_feature_start "$@" ;;
         ship) shift; cmd_feature_ship "$@" ;;
+        submit) shift; cmd_feature_submit "$@" ;;
         finish) shift; cmd_feature_finish "$@" ;;
-        *) die "usage: bga feature <start|ship> ..." ;;
+        *) die "usage: bga feature <start|ship|submit|finish> ..." ;;
       esac
       ;;
     worktree|wt)
