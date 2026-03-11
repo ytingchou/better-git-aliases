@@ -301,6 +301,9 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git lg [query]`: open `lazygit` in current or selected worktree
 - `git codex [query]`: run `codex` in current or selected worktree
 - `git cline [query]`: run `cline` in current or selected worktree
+- `git ghrepo [--open]`: print or open the GitHub repo URL
+- `git ghcompare [base] [--open]`: print or open the compare URL for the current branch
+- `git ghpr [base] [--open]`: print or open the new PR URL for the current branch
 - `git cockpit [query]`: create/attach a tmux session with shell + git + AI windows
 - `git cockpit list-layouts`: show available tmux cockpit layouts
 - `git cockpit [query] --layout <solo|review|ai-pair|multi-feature>`: choose a cockpit layout explicitly
@@ -610,6 +613,14 @@ Example:
 git cockpit billing --layout review
 ```
 
+GitHub helpers for the current branch:
+
+```bash
+git ghrepo
+git ghcompare
+git ghpr --open
+```
+
 ### 5.5 Use tmux as the control plane
 
 For heavier work, prefer tmux over many loose terminal tabs:
@@ -631,6 +642,13 @@ If you want a layout specialized for review or multiple active branches:
 ```bash
 git cockpit billing --layout review
 git cockpit --layout multi-feature
+```
+
+If you are about to open a PR, these are the most useful shortcuts:
+
+```bash
+git ghcompare
+git ghpr --open
 ```
 
 ### 6. Daily maintenance

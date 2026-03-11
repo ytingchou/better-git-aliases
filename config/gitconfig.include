@@ -18,4 +18,7 @@
   lg = "!f() { \"$HOME/.local/bin/bga\" lazygit \"$@\"; }; f"
   codex = "!f() { \"$HOME/.local/bin/bga\" codex \"$@\"; }; f"
   cline = "!f() { \"$HOME/.local/bin/bga\" cline \"$@\"; }; f"
+  ghrepo = "!f() { \"$HOME/.local/bin/bga\" github repo \"$@\"; }; f"
+  ghcompare = "!f() { \"$HOME/.local/bin/bga\" github compare \"$@\"; }; f"
+  ghpr = "!f() { \"$HOME/.local/bin/bga\" github pr \"$@\"; }; f"
   cockpit = "!f() { \"$HOME/.local/bin/bga\" cockpit \"$@\"; }; f"

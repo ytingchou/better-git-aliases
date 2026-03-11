@@ -363,6 +363,41 @@ open_ai_cli() {
   (cd "$target" && "$tool")
 }
 
+open_url() {
+  local url="$1"
+  if has xdg-open; then
+    xdg-open "$url" >/dev/null 2>&1 &
+  elif has open; then
+    open "$url" >/dev/null 2>&1 &
+  else
+    die "no supported URL opener found; print the URL and open it manually"
+  fi
+}
+
+github_https_remote_url() {
+  local remote="${1:-origin}" url host path
+  url="$(git remote get-url "$remote" 2>/dev/null || true)"
+  [ -n "$url" ] || die "git remote '$remote' not found"
+  case "$url" in
+    git@github.com:*)
+      path="${url#git@github.com:}"
+      path="${path%.git}"
+      printf 'https://github.com/%s\n' "$path"
+      ;;
+    https://github.com/*)
+      printf '%s\n' "${url%.git}"
+      ;;
+    ssh://git@github.com/*)
+      path="${url#ssh://git@github.com/}"
+      path="${path%.git}"
+      printf 'https://github.com/%s\n' "$path"
+      ;;
+    *)
+      die "remote '$remote' is not a supported GitHub URL: $url"
+      ;;
+  esac
+}
+
 tmux_attach_or_switch() {
   local session="$1"
   if [ -n "${TMUX:-}" ]; then
@@ -494,6 +529,10 @@ Tool integrations:
   bga lazygit [QUERY]           Open current or chosen worktree in lazygit
   bga codex [QUERY]             Run codex in current or chosen worktree
   bga cline [QUERY]             Run cline in current or chosen worktree
+  bga github repo [--open]      Print or open the GitHub repo URL
+  bga github compare [BASE] [--open]
+                                Print or open the compare URL for current branch
+  bga github pr [BASE] [--open] Print or open the new PR URL for current branch
   bga cockpit [QUERY] [--layout LAYOUT]
                                 Open tmux cockpit for a worktree
   bga cockpit list-layouts      Show available cockpit layouts
@@ -1032,6 +1071,64 @@ cmd_cline() {
   open_ai_cli cline "$target"
 }
 
+cmd_github_repo() {
+  ensure_repo
+  local open_flag=0 url
+  if [ "${1:-}" = "--open" ]; then
+    open_flag=1
+  fi
+  url="$(github_https_remote_url origin)"
+  if [ "$open_flag" -eq 1 ]; then
+    open_url "$url"
+  else
+    printf '%s\n' "$url"
+  fi
+}
+
+cmd_github_compare() {
+  ensure_repo
+  local base="" open_flag=0 branch url repo_url
+  branch="$(current_branch)"
+  [ -n "$branch" ] || die "detached HEAD; checkout a branch first"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --open) open_flag=1 ;;
+      *) base="$1" ;;
+    esac
+    shift || true
+  done
+  [ -n "$base" ] || base="$(default_base_branch)"
+  repo_url="$(github_https_remote_url origin)"
+  url="${repo_url}/compare/${base}...${branch}?expand=1"
+  if [ "$open_flag" -eq 1 ]; then
+    open_url "$url"
+  else
+    printf '%s\n' "$url"
+  fi
+}
+
+cmd_github_pr() {
+  ensure_repo
+  local base="" open_flag=0 branch url repo_url
+  branch="$(current_branch)"
+  [ -n "$branch" ] || die "detached HEAD; checkout a branch first"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --open) open_flag=1 ;;
+      *) base="$1" ;;
+    esac
+    shift || true
+  done
+  [ -n "$base" ] || base="$(default_base_branch)"
+  repo_url="$(github_https_remote_url origin)"
+  url="${repo_url}/compare/${base}...${branch}?expand=1&template=pull_request_template.md"
+  if [ "$open_flag" -eq 1 ]; then
+    open_url "$url"
+  else
+    printf '%s\n' "$url"
+  fi
+}
+
 cmd_cockpit() {
   local target="." layout="solo"
   if [ "${1:-}" = "list-layouts" ]; then
@@ -1147,6 +1244,8 @@ run_menu_action() {
     "Resume existing feature") menu_prompt_resume_feature ;;
     "Review and commit changes") menu_review_and_commit ;;
     "Clean up merged work") menu_cleanup_merged_work ;;
+    "Open GitHub compare for current branch") cmd_github_compare --open ;;
+    "Open GitHub PR page for current branch") cmd_github_pr --open ;;
     "Doctor") cmd_doctor ;;
     "Bootstrap dependencies") cmd_bootstrap ;;
     "Install lazygit config") cmd_lazygit_config install ;;
@@ -1174,6 +1273,23 @@ Shows:
 - recommended tools
 - git include installation
 - shell helper status
+EOF
+      ;;
+    "Open GitHub compare for current branch")
+      cat <<'EOF'
+Open the GitHub compare page for the current branch.
+
+Useful before:
+- creating a PR
+- checking the final diff
+- sharing a review URL
+EOF
+      ;;
+    "Open GitHub PR page for current branch")
+      cat <<'EOF'
+Open the GitHub new-PR page for the current branch.
+
+Uses the current branch and the default base branch unless you specify another base manually in CLI usage.
 EOF
       ;;
     "Start a new feature")
@@ -1340,7 +1456,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nClean up merged work\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nHelp'
+  items=$'Start a new feature\nResume existing feature\nReview and commit changes\nClean up merged work\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nDoctor\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \
@@ -1399,6 +1515,14 @@ main() {
     lazygit|lg) cmd_lazygit "$@" ;;
     codex) cmd_codex "$@" ;;
     cline) cmd_cline "$@" ;;
+    github)
+      case "${1:-}" in
+        repo) shift; cmd_github_repo "$@" ;;
+        compare) shift; cmd_github_compare "$@" ;;
+        pr) shift; cmd_github_pr "$@" ;;
+        *) die "usage: bga github <repo|compare|pr> [--open]" ;;
+      esac
+      ;;
     cockpit) cmd_cockpit "$@" ;;
     init) cmd_init "$@" ;;
     *) die "unknown command: $cmd" ;;
