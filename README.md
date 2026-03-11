@@ -190,6 +190,7 @@ git config-bga list
 ```
 
 If your team wants shared defaults inside one repo, copy [.bga.env.example](.bga.env.example) to `.bga.env` in the repo root and commit it.
+This also supports `protected_branches` for cleanup safety.
 
 Resolution order is:
 
@@ -341,7 +342,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git cockpit [query]`: create/attach a tmux session with shell + git + AI windows
 - `git cockpit list-layouts`: show available tmux cockpit layouts
 - `git cockpit [query] --layout <solo|review|ai-pair|multi-feature>`: choose a cockpit layout explicitly
-- `git config-bga get|set|list`: manage personal overrides such as `base_branch`, `remote`, `cockpit_layout`, and `workspace_root`
+- `git config-bga get|set|list`: manage personal overrides such as `base_branch`, `remote`, `cockpit_layout`, `workspace_root`, and `protected_branches`
 
 ## Usage tutorial
 
@@ -800,6 +801,12 @@ If your whole team uses the same base branch or preferred cockpit layout in one 
 
 ```bash
 cp .bga.env.example .bga.env
+```
+
+If your team keeps extra long-lived branches locally, add them there too:
+
+```bash
+protected_branches=main,master,develop,dev,release
 ```
 
 At the end of work:

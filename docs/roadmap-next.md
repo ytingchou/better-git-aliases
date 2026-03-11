@@ -136,19 +136,37 @@ Goal:
 
 - let teams define which local branches should never be touched by cleanup helpers
 
-Possible additions:
+Delivered:
 
 - repo-level protected branch list in `.bga.env`
 - user override support
 - `prune-merged` and cleanup commands honoring that list
 
-Why:
+Why it mattered:
 
 - branch cleanup should be opinionated, but not hard-coded to only a few branch names
 
+## Next
+
+### 9. Demo polish
+
+Goal:
+
+- improve adoption from the repo homepage and docs
+
+Possible additions:
+
+- actual screenshots
+- animated terminal gifs
+- richer workspace and team-config examples
+
+Why:
+
+- the workflow is now deeper, so showing it matters more
+
 ## Later
 
-### 9. Provider abstraction
+### 10. Provider abstraction
 
 Goal:
 
@@ -162,19 +180,3 @@ Possible additions:
 Why:
 
 - useful, but not required for the main Git-native workflow
-
-### 10. Demo polish
-
-Goal:
-
-- improve adoption from the repo homepage
-
-Possible additions:
-
-- screenshots
-- gifs
-- richer examples
-
-Why:
-
-- presentation matters, but workflow quality comes first

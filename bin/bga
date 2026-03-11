@@ -89,8 +89,31 @@ base_branch
 remote
 cockpit_layout
 workspace_root
+protected_branches
 EOF
   [ "$found" -eq 1 ] || printf '  (none)\n'
+}
+
+default_protected_branches() {
+  printf 'main\ndevelop\nmaster\ndev\n'
+}
+
+configured_protected_branches() {
+  local configured
+  configured="$(config_get protected_branches || true)"
+  if [ -n "$configured" ]; then
+    printf '%s\n' "$configured" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | awk 'NF'
+  else
+    default_protected_branches
+  fi
+}
+
+protected_branches_regex() {
+  local current="${1:-}"
+  {
+    configured_protected_branches
+    [ -n "$current" ] && printf '%s\n' "$current"
+  } | awk 'NF && !seen[$0]++' | paste -sd'|' -
 }
 
 asset_path() {
@@ -872,6 +895,7 @@ base_branch
 remote
 cockpit_layout
 workspace_root
+protected_branches
 EOF
 
   printf '\nnext steps:\n'
@@ -1232,7 +1256,7 @@ cmd_prune_merged() {
   ensure_repo
   local protected current
   current="$(current_branch)"
-  protected="main|master|develop|dev|${current}"
+  protected="$(protected_branches_regex "$current")"
   while read -r branch; do
     [ -n "$branch" ] || continue
     git branch -d "$branch"
@@ -1418,7 +1442,7 @@ cmd_feature_finish() {
 
 cmd_feature_cleanup() {
   ensure_repo
-  local branch="" base="" apply=0
+  local branch="" base="" apply=0 protected
   while [ $# -gt 0 ]; do
     case "$1" in
       --base)
@@ -1461,9 +1485,10 @@ cmd_feature_cleanup() {
   cmd_worktree_stale "$base"
 
   printf '\nMerged branch cleanup preview:\n'
+  protected="$(protected_branches_regex "$branch")"
   git branch --merged \
     | sed 's/^[* ]*//' \
-    | grep -Ev "^(main|master|develop|dev|${branch})$" \
+    | grep -Ev "^(${protected})$" \
     | awk 'NF { print "  " $0 }' || true
 
   if [ "$apply" -eq 0 ]; then
@@ -1926,6 +1951,7 @@ Inspect or change defaults such as:
 - remote
 - cockpit_layout
 - workspace_root
+- protected_branches
 
 Resolution order:
 - user overrides from config-bga
@@ -2213,6 +2239,10 @@ Protected by default:
 - develop
 - dev
 - current branch
+
+Override with:
+- protected_branches in .bga.env
+- protected_branches via git config-bga set
 EOF
       ;;
     "Help")
