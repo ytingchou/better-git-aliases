@@ -16,6 +16,7 @@
   dash = "!\"$HOME/.local/bin/bga\" dashboard"
   ws = "!f() { \"$HOME/.local/bin/bga\" workspace \"$@\"; }; f"
   wsdash = "!f() { \"$HOME/.local/bin/bga\" workspace dash \"$@\"; }; f"
+  wsrecent = "!f() { \"$HOME/.local/bin/bga\" workspace recent \"$@\"; }; f"
   wssync = "!f() { \"$HOME/.local/bin/bga\" workspace sync \"$@\"; }; f"
   wsmenu = "!f() { \"$HOME/.local/bin/bga\" workspace menu \"$@\"; }; f"
   sync = "!\"$HOME/.local/bin/bga\" sync"

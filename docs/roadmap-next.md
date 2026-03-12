@@ -85,12 +85,17 @@ Goal:
 
 - make workspace views prioritize what actually needs attention
 
-Candidates:
+Delivered so far:
 
 - workspace attention summary
 - dirty-first sorting
 - no-upstream and ahead/behind prioritization
 - recent repo entrypoint
+
+Still open:
+
+- workspace stale branch summary
+- richer multi-repo attention grouping
 
 Why:
 

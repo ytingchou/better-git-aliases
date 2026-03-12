@@ -8,6 +8,10 @@ has() {
   command -v "$1" >/dev/null 2>&1
 }
 
+can_use_fzf() {
+  has fzf && [ -t 0 ] && [ -t 1 ]
+}
+
 config_home() {
   printf '%s/.config/better-git-aliases\n' "${HOME}"
 }
@@ -261,7 +265,7 @@ require_clean_or_confirm() {
 
 fzf_or_first() {
   local prompt="${1:-select> }"
-  if has fzf; then
+  if can_use_fzf; then
     fzf --height=80% --layout=reverse --border --prompt="$prompt"
   else
     head -n 1
@@ -393,31 +397,65 @@ workspace_repo_worktree_count() {
   (cd "$path" && list_worktrees | awk 'NF { c++ } END { print c + 0 }')
 }
 
+workspace_repo_last_commit_epoch() {
+  local path="$1"
+  (cd "$path" && git log -1 --format='%ct' 2>/dev/null || printf '0\n')
+}
+
+workspace_repo_status_fields() {
+  local repo="$1" branch dirty upstream worktrees counts parsed ahead behind priority last_commit
+  branch="$(workspace_repo_branch "$repo")"
+  dirty='clean'
+  if repo_is_dirty "$repo"; then
+    dirty='dirty'
+  fi
+  upstream="$(workspace_repo_upstream_summary "$repo")"
+  worktrees="$(workspace_repo_worktree_count "$repo")"
+  last_commit="$(workspace_repo_last_commit_epoch "$repo")"
+  priority=0
+  case "$dirty" in
+    dirty) priority=$((priority + 30)) ;;
+  esac
+  case "$upstream" in
+    no\ upstream) priority=$((priority + 20)) ;;
+    ahead*)
+      counts="${upstream#ahead }"
+      parsed="$(printf '%s' "$counts" | sed 's# / behind # #')"
+      ahead="${parsed%% *}"
+      behind="${parsed##* }"
+      if [ "${ahead:-0}" -gt 0 ] || [ "${behind:-0}" -gt 0 ]; then
+        priority=$((priority + 10))
+      fi
+      ;;
+  esac
+  printf '%s|%s|%s|%s|%s|%s|%s\n' "$repo" "${branch:-detached}" "$dirty" "$upstream" "$worktrees" "$priority" "$last_commit"
+}
+
 list_workspace_repos() {
-  local root="${1:-$(workspace_root)}" repo branch dirty
+  local root="${1:-$(workspace_root)}" repo
   while IFS= read -r repo; do
     [ -n "$repo" ] || continue
-    branch="$(workspace_repo_branch "$repo")"
-    dirty='clean'
-    if repo_is_dirty "$repo"; then
-      dirty='dirty'
-    fi
-    printf '%s|%s|%s\n' "$repo" "${branch:-detached}" "$dirty"
+    workspace_repo_status_fields "$repo"
   done < <(workspace_repo_roots "$root")
+}
+
+sorted_workspace_repos() {
+  local root="${1:-$(workspace_root)}"
+  list_workspace_repos "$root" | sort -t'|' -k6,6nr -k7,7nr -k1,1
 }
 
 workspace_repo_picker() {
   local root="${1:-$(workspace_root)}"
-  if has fzf; then
-    list_workspace_repos "$root" | fzf \
+  if can_use_fzf; then
+    sorted_workspace_repos "$root" | fzf \
       --delimiter='|' \
-      --with-nth=2,3,1 \
+      --with-nth=2,3,4,1 \
       --preview-window='right,65%,border-left' \
       --height=85% \
       --layout=reverse \
       --border \
       --prompt='repo> ' \
-      --header='branch | status | path' \
+      --header='branch | status | upstream | path' \
       --preview '
         path=$(printf "%s" {} | cut -d"|" -f1)
         if [ -d "$path" ]; then
@@ -432,7 +470,7 @@ workspace_repo_picker() {
       ' \
       | cut -d'|' -f1
   else
-    list_workspace_repos "$root" | column -t -s '|' | fzf_or_first "repo> " | awk '{print $1}'
+    sorted_workspace_repos "$root" | column -t -s '|' | fzf_or_first "repo> " | awk '{print $1}'
   fi
 }
 
@@ -814,8 +852,8 @@ Core:
   bga start-day                 Run doctor, sync, and dashboard in sequence
   bga finish-day                Run pause summary and dashboard in sequence
   bga dashboard                 Show repo + worktree overview
-  bga workspace <list|dash|sync|menu> [ROOT]
-                                Show, sync, or interact with repos under one workspace root
+  bga workspace <list|dash|recent|sync|menu> [ROOT]
+                                Show, prioritize, sync, or interact with repos under one workspace root
   bga sync                      Fetch and rebase current branch
   bga review [status|diff]      Review current branch before commit/submit
   bga recent                    Pick and checkout a recent branch
@@ -881,7 +919,7 @@ Recommended git aliases after install:
   git finish-day
   git menu
   git dash
-  git ws / git wsdash / git wssync / git wsmenu
+  git ws / git wsdash / git wsrecent / git wssync / git wsmenu
   git sync
   git recent
   git wt / git wta / git wtrm / git wttmux
@@ -1380,23 +1418,65 @@ cmd_workspace_list() {
 }
 
 cmd_workspace_dash() {
-  local root="${1:-$(workspace_root)}" repo branch dirty upstream worktrees
+  local root="${1:-$(workspace_root)}" repo branch dirty upstream worktrees priority last_commit
+  local total=0 dirty_count=0 no_upstream_count=0 ahead_behind_count=0
   printf 'workspace root: %s\n\n' "$root"
-  while IFS= read -r repo; do
+  while IFS='|' read -r repo branch dirty upstream worktrees priority last_commit; do
     [ -n "$repo" ] || continue
-    branch="$(workspace_repo_branch "$repo")"
-    dirty='clean'
-    if repo_is_dirty "$repo"; then
-      dirty='dirty'
-    fi
-    upstream="$(workspace_repo_upstream_summary "$repo")"
-    worktrees="$(workspace_repo_worktree_count "$repo")"
+    total=$((total + 1))
+    [ "$dirty" = "dirty" ] && dirty_count=$((dirty_count + 1))
+    [ "$upstream" = "no upstream" ] && no_upstream_count=$((no_upstream_count + 1))
+    case "$upstream" in
+      ahead*)
+        if [ "$upstream" != "ahead 0 / behind 0" ]; then
+          ahead_behind_count=$((ahead_behind_count + 1))
+        fi
+        ;;
+    esac
+  done < <(sorted_workspace_repos "$root")
+
+  printf 'attention:\n'
+  printf '  repos:          %s\n' "$total"
+  printf '  dirty:          %s\n' "$dirty_count"
+  printf '  no upstream:    %s\n' "$no_upstream_count"
+  printf '  ahead/behind:   %s\n\n' "$ahead_behind_count"
+
+  while IFS='|' read -r repo branch dirty upstream worktrees priority last_commit; do
+    [ -n "$repo" ] || continue
     printf '%s\n' "$repo"
     printf '  branch:    %s\n' "${branch:-detached}"
     printf '  status:    %s\n' "$dirty"
     printf '  upstream:  %s\n' "$upstream"
     printf '  worktrees: %s\n\n' "$worktrees"
-  done < <(workspace_repo_roots "$root")
+  done < <(sorted_workspace_repos "$root")
+}
+
+cmd_workspace_recent() {
+  local root="${1:-$(workspace_root)}"
+  if can_use_fzf; then
+    sorted_workspace_repos "$root" | fzf \
+      --delimiter='|' \
+      --with-nth=2,3,4,1 \
+      --preview-window='right,65%,border-left' \
+      --height=85% \
+      --layout=reverse \
+      --border \
+      --prompt='recent-repo> ' \
+      --header='branch | status | upstream | path' \
+      --preview '
+        path=$(printf "%s" {} | cut -d"|" -f1)
+        if [ -d "$path" ]; then
+          cd "$path" || exit 1
+          printf "Path: %s\n\n" "$path"
+          git status -sb
+          printf "\nRecent commits:\n"
+          git log --oneline --decorate -n 10
+        fi
+      ' \
+      | cut -d'|' -f1
+  else
+    sorted_workspace_repos "$root" | column -t -s '|' | fzf_or_first "recent-repo> " | awk '{print $1}'
+  fi
 }
 
 cmd_workspace_sync() {
@@ -1473,10 +1553,11 @@ cmd_workspace() {
   case "$action" in
     list) cmd_workspace_list "${1:-}" ;;
     dash) cmd_workspace_dash "${1:-}" ;;
+    recent) cmd_workspace_recent "${1:-}" ;;
     sync) cmd_workspace_sync "${1:-}" ;;
     menu) cmd_workspace_menu "${1:-}" ;;
     action) cmd_workspace_action "${1:-}" "${2:-}" ;;
-    *) die "usage: bga workspace <list|dash|sync|menu> [ROOT]" ;;
+    *) die "usage: bga workspace <list|dash|recent|sync|menu> [ROOT]" ;;
   esac
 }
 
