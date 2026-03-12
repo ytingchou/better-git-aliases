@@ -841,6 +841,7 @@ Core:
   bga release-check             Verify version, release files, and tag readiness
   bga release-init VERSION      Scaffold a new release note from recent commits
   bga remote-info [REMOTE]      Show parsed host/provider info for a git remote
+  bga remote-menu [BASE]        Open a focused remote actions menu
   bga remote-status [BASE]      Show branch, provider, and compare readiness
   bga remote-open [REMOTE]      Open the parsed web URL for a git remote
   bga remote-compare [BASE] [COMPARE] [--open]
@@ -909,6 +910,7 @@ Recommended git aliases after install:
   git release-check
   git release-init
   git remote-info
+  git remote-menu
   git remote-status
   git remote-open
   git remote-compare
@@ -1145,6 +1147,60 @@ cmd_remote_info() {
   printf 'git url:   %s\n' "$raw_url"
 }
 
+cmd_remote_menu() {
+  local base="${1:-$(default_base_branch)}" items selected
+  items=$'Show remote status\nOpen remote repo\nOpen remote compare\nShow remote info'
+  if can_use_fzf; then
+    selected="$(printf '%s\n' "$items" | fzf \
+      --height=40% \
+      --layout=reverse \
+      --border \
+      --preview-window='right,55%,border-left,wrap' \
+      --prompt='remote> ' \
+      --header='remote actions' \
+      --preview "\"${BGA_BIN_DIR}/bga\" __remote-menu-preview {}" )"
+  else
+    printf '%s\n' "$items"
+    printf 'select exactly one label: '
+    read -r selected
+  fi
+  [ -n "${selected:-}" ] || return 0
+  case "$selected" in
+    "Show remote status") cmd_remote_status "$base" ;;
+    "Open remote repo") cmd_remote_open ;;
+    "Open remote compare") cmd_remote_compare "$base" --open ;;
+    "Show remote info") cmd_remote_info ;;
+  esac
+}
+
+remote_menu_preview() {
+  case "$1" in
+    "Show remote status")
+      cat <<'EOF'
+Show the current branch, base branch, provider, upstream state, and compare readiness.
+EOF
+      ;;
+    "Open remote repo")
+      cat <<'EOF'
+Open the current remote's parsed web URL in your browser.
+EOF
+      ;;
+    "Open remote compare")
+      cat <<'EOF'
+Open a compare URL for supported providers.
+
+Fallback behavior:
+- unsupported providers print guidance and fall back to the repo URL
+EOF
+      ;;
+    "Show remote info")
+      cat <<'EOF'
+Show provider, host, path, web URL, and raw Git URL for the current remote.
+EOF
+      ;;
+  esac
+}
+
 cmd_remote_status() {
   local base="${1:-$(default_base_branch)}" branch parsed provider web_url upstream counts parsed_counts ahead behind
   ensure_repo
@@ -1196,6 +1252,10 @@ cmd_remote_compare() {
     case "$1" in
       --open)
         open_flag=1
+        ;;
+      --)
+        shift
+        break
         ;;
       *)
         if [ -z "$base" ]; then
@@ -2292,9 +2352,7 @@ run_menu_action() {
     "Open worktree in lazygit") cmd_worktree_lazygit ;;
     "Open worktree cockpit (tmux)") cmd_worktree_tmux ;;
     "Prune merged branches") cmd_prune_merged ;;
-    "Show remote status") cmd_remote_status ;;
-    "Open remote repo") cmd_remote_open ;;
-    "Open remote compare") cmd_remote_compare --open ;;
+    "Remote actions") cmd_remote_menu ;;
     "Help") cmd_help ;;
   esac
 }
@@ -2613,30 +2671,15 @@ Override with:
 - protected_branches via git config-bga set
 EOF
       ;;
-    "Show remote status")
+    "Remote actions")
       cat <<'EOF'
-Show the current branch, base branch, provider, upstream state, and compare readiness.
+Open a focused menu for host-aware remote actions.
 
-Useful when:
-- you are not sure what the current remote can support safely
-- you switch between GitHub, GitLab, Azure DevOps, and generic hosts
-EOF
-      ;;
-    "Open remote repo")
-      cat <<'EOF'
-Open the current remote's parsed web URL.
-
-Useful when:
-- you want to jump to the hosting UI without caring about provider-specific URL formats
-EOF
-      ;;
-    "Open remote compare")
-      cat <<'EOF'
-Open a compare URL for supported providers.
-
-Behavior:
-- GitHub and GitLab open compare URLs
-- unsupported providers fall back safely to the repo URL with guidance
+Includes:
+- remote status
+- remote repo
+- remote compare
+- remote info
 EOF
       ;;
     "Help")
@@ -2649,7 +2692,7 @@ EOF
 
 cmd_menu() {
   local items selected
-  items=$'Start the workday\nFinish the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nWorkspace overview\nWorkspace action menu\nSync all repos in workspace\nDoctor\nConfigure defaults\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nShow remote status\nOpen remote repo\nOpen remote compare\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
+  items=$'Start the workday\nFinish the workday\nStart a new feature\nResume existing feature\nPause current feature\nReview and commit changes\nSubmit current feature for review\nClean up current feature after merge\nClean up merged work\nWorkspace overview\nWorkspace action menu\nSync all repos in workspace\nDoctor\nConfigure defaults\nBootstrap dependencies\nInstall lazygit config\nDashboard\nSync current branch\nCheckout recent branch\nBrowse commits\nCreate feature worktree\nList worktrees\nOpen worktree in lazygit\nOpen worktree cockpit (tmux)\nPrune merged branches\nRemote actions\nShow GitHub status for current branch\nPublish current branch to GitHub\nPublish branch and open PR flow\nOpen GitHub compare for current branch\nOpen GitHub PR page for current branch\nHelp'
   if has fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=80% \
@@ -2674,11 +2717,13 @@ main() {
 
   case "$cmd" in
     __menu-preview) menu_preview "${1:-}" ;;
+    __remote-menu-preview) remote_menu_preview "${1:-}" ;;
     help|-h|--help) cmd_help ;;
     doctor) cmd_doctor ;;
     release-check) cmd_release_check ;;
     release-init) cmd_release_init "$@" ;;
     remote-info) cmd_remote_info "$@" ;;
+    remote-menu) cmd_remote_menu "$@" ;;
     remote-status) cmd_remote_status "$@" ;;
     remote-open) cmd_remote_open "$@" ;;
     remote-compare) cmd_remote_compare "$@" ;;
