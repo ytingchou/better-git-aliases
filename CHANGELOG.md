@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.5.2] - 2026-03-13
+
+### Added
+
+- `wsrecent` alias and workspace recent repo picker
+- workspace attention summary and prioritization in `wsdash`
+- roadmap portfolio document for higher-level planning
+- provider capability matrix documentation
+
+### Changed
+
+- workspace views now prioritize dirty repos and repos with upstream issues
+- workspace pickers now fall back cleanly outside interactive TTY sessions
+- roadmap docs now distinguish portfolio, short-term queue, and version roadmaps
+
 ## [0.5.1] - 2026-03-13
 
 ### Added
