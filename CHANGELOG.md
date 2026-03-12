@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.5.3] - 2026-03-13
+
+### Added
+
+- `remote-menu` command and alias as a focused entrypoint for remote actions
+- `remote-capabilities` command and alias for provider capability summaries
+
+### Changed
+
+- `remote-status` now recommends a concrete next step based on provider support and upstream state
+- `remote-menu` now supports interactive base/compare override before opening compare URLs
+- remote review actions are now easier to discover and use as one flow
+
 ## [0.5.2] - 2026-03-13
 
 ### Added
