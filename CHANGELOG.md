@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.5.1] - 2026-03-13
+
+### Added
+
+- `remote-status` command and alias for branch, provider, and compare readiness summaries
+- remote actions inside `git menu`
+- `docs/roadmap-v0.6.0.md` for the next provider-aware documentation and review direction
+
+### Changed
+
+- Remote actions are now easier to discover without memorizing commands
+- Host-aware workflow guidance now has a clearer next-step roadmap
+
 ## [0.5.0] - 2026-03-13
 
 ### Added
