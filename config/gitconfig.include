@@ -4,6 +4,7 @@
   release-check = "!\"$HOME/.local/bin/bga\" release-check"
   release-init = "!f() { \"$HOME/.local/bin/bga\" release-init \"$@\"; }; f"
   remote-info = "!f() { \"$HOME/.local/bin/bga\" remote-info \"$@\"; }; f"
+  remote-open = "!f() { \"$HOME/.local/bin/bga\" remote-open \"$@\"; }; f"
   bootstrap = "!f() { \"$HOME/.local/bin/bga\" bootstrap \"$@\"; }; f"
   lazygit-config = "!f() { \"$HOME/.local/bin/bga\" lazygit-config \"$@\"; }; f"
   workflow-help = "!\"$HOME/.local/bin/bga\" help"

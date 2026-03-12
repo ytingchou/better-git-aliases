@@ -784,6 +784,7 @@ Core:
   bga release-check             Verify version, release files, and tag readiness
   bga release-init VERSION      Scaffold a new release note from recent commits
   bga remote-info [REMOTE]      Show parsed host/provider info for a git remote
+  bga remote-open [REMOTE]      Open the parsed web URL for a git remote
   bga config <get|set|list>     Manage simple better-git-aliases config
   bga bootstrap [brew|apt]      Install recommended dependencies
   bga lazygit-config <subcmd>   Manage curated lazygit config
@@ -848,6 +849,7 @@ Recommended git aliases after install:
   git release-check
   git release-init
   git remote-info
+  git remote-open
   git config-bga
   git bootstrap
   git lazygit-config
@@ -1079,6 +1081,13 @@ cmd_remote_info() {
   printf 'path:      %s\n' "$path"
   printf 'web url:   %s\n' "$web_url"
   printf 'git url:   %s\n' "$raw_url"
+}
+
+cmd_remote_open() {
+  local parsed web_url
+  parsed="$(remote_info_fields "${1:-$(config_get remote || printf 'origin')}")"
+  web_url="$(printf '%s' "$parsed" | cut -d'|' -f5)"
+  open_url "$web_url"
 }
 
 cmd_bootstrap() {
@@ -2454,6 +2463,7 @@ main() {
     release-check) cmd_release_check ;;
     release-init) cmd_release_init "$@" ;;
     remote-info) cmd_remote_info "$@" ;;
+    remote-open) cmd_remote_open "$@" ;;
     config) cmd_config "$@" ;;
     bootstrap) cmd_bootstrap "$@" ;;
     lazygit-config) cmd_lazygit_config "$@" ;;
