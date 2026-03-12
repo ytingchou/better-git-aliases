@@ -176,6 +176,7 @@ Delivered:
 - version consistency checks
 - `release-check` command
 - release note presence check
+- `release-init` scaffolding command
 
 Why it mattered:
 

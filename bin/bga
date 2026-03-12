@@ -161,6 +161,10 @@ timestamp() {
   date '+%Y%m%d-%H%M%S'
 }
 
+latest_version_tag() {
+  git tag --list 'v*' --sort=-version:refname | head -n 1
+}
+
 path_has_dir() {
   local dir="$1" item old_ifs
   old_ifs="${IFS:- }"
@@ -715,6 +719,7 @@ Core:
   bga help                      Show this help
   bga doctor                    Check environment and dependencies
   bga release-check             Verify version, release files, and tag readiness
+  bga release-init VERSION      Scaffold a new release note from recent commits
   bga config <get|set|list>     Manage simple better-git-aliases config
   bga bootstrap [brew|apt]      Install recommended dependencies
   bga lazygit-config <subcmd>   Manage curated lazygit config
@@ -777,6 +782,7 @@ Shell integration:
 Recommended git aliases after install:
   git doctor
   git release-check
+  git release-init
   git config-bga
   git bootstrap
   git lazygit-config
@@ -957,6 +963,39 @@ cmd_release_check() {
   fi
 
   return "$status"
+}
+
+cmd_release_init() {
+  local version="${1:-}" previous_tag note_file
+  [ -n "$version" ] || die "usage: bga release-init <version>"
+  note_file="${BGA_ROOT}/release-notes/v${version}.md"
+  [ ! -f "$note_file" ] || die "release note already exists: $note_file"
+  previous_tag="$(latest_version_tag)"
+
+  {
+    printf '# better-git-aliases v%s\n\n' "$version"
+    printf 'Release summary.\n\n'
+    printf '## Highlights\n\n'
+    printf -- '- highlight 1\n'
+    printf -- '- highlight 2\n'
+    printf -- '- highlight 3\n\n'
+    printf '## Commit summary\n\n'
+    if [ -n "$previous_tag" ]; then
+      git log --oneline "${previous_tag}..HEAD" | sed 's/^/- /'
+    else
+      git log --oneline | sed 's/^/- /'
+    fi
+    printf '\n## Notes\n\n'
+    printf -- '- Version: `%s`\n' "$version"
+    printf -- '- License: MIT\n'
+  } >"$note_file"
+
+  printf 'Created release note: %s\n' "$note_file"
+  if [ -n "$previous_tag" ]; then
+    printf 'Based on commits since: %s\n' "$previous_tag"
+  else
+    printf 'Based on all commits because no previous version tag was found.\n'
+  fi
 }
 
 cmd_bootstrap() {
@@ -2330,6 +2369,7 @@ main() {
     help|-h|--help) cmd_help ;;
     doctor) cmd_doctor ;;
     release-check) cmd_release_check ;;
+    release-init) cmd_release_init "$@" ;;
     config) cmd_config "$@" ;;
     bootstrap) cmd_bootstrap "$@" ;;
     lazygit-config) cmd_lazygit_config "$@" ;;
