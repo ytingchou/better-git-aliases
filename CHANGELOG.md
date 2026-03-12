@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.4.2] - 2026-03-13
+
+### Added
+
+- `release-init` command and `git release-init` alias for scaffolding release note files
+- `remote-info` command and `git remote-info` alias for inspecting GitHub, GitLab, Azure DevOps, and generic remotes
+
+### Changed
+
+- Release workflow now supports release note scaffolding from commits since the latest tag
+- Remote parsing primitives now support Azure DevOps SSH and HTTPS URL formats
+
 ## [0.4.1] - 2026-03-12
 
 ### Added
