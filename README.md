@@ -302,6 +302,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git release-check`: verify release version consistency and required release files
 - `git release-init <version>`: scaffold a new release note file from commits since the latest version tag
 - `git remote-info [remote]`: inspect the current remote as GitHub, GitLab, Azure DevOps, or generic host info
+- `git remote-status [base]`: show the current branch, base branch, provider, upstream state, and compare readiness
 - `git remote-open [remote]`: open the parsed web URL for the current remote in your browser
 - `git remote-compare [base] [compare]`: print a compare URL for supported providers, with safe fallback for others
 - `git bootstrap [brew|apt]`: install recommended dependencies

@@ -803,6 +803,7 @@ Core:
   bga release-check             Verify version, release files, and tag readiness
   bga release-init VERSION      Scaffold a new release note from recent commits
   bga remote-info [REMOTE]      Show parsed host/provider info for a git remote
+  bga remote-status [BASE]      Show branch, provider, and compare readiness
   bga remote-open [REMOTE]      Open the parsed web URL for a git remote
   bga remote-compare [BASE] [COMPARE] [--open]
                                 Print or open a compare URL when the provider supports it
@@ -870,6 +871,7 @@ Recommended git aliases after install:
   git release-check
   git release-init
   git remote-info
+  git remote-status
   git remote-open
   git remote-compare
   git config-bga
@@ -1103,6 +1105,44 @@ cmd_remote_info() {
   printf 'path:      %s\n' "$path"
   printf 'web url:   %s\n' "$web_url"
   printf 'git url:   %s\n' "$raw_url"
+}
+
+cmd_remote_status() {
+  local base="${1:-$(default_base_branch)}" branch parsed provider web_url upstream counts parsed_counts ahead behind
+  ensure_repo
+  branch="$(current_branch)"
+  [ -n "$branch" ] || die "detached HEAD; checkout a branch first"
+  parsed="$(remote_info_fields)"
+  provider="$(printf '%s' "$parsed" | cut -d'|' -f2)"
+  web_url="$(printf '%s' "$parsed" | cut -d'|' -f5)"
+  upstream="$(branch_upstream "$branch")"
+
+  printf 'branch:     %s\n' "$branch"
+  printf 'base:       %s\n' "$base"
+  printf 'provider:   %s\n' "$provider"
+  printf 'repo url:   %s\n' "$web_url"
+  printf 'compare:    '
+  case "$provider" in
+    github|gitlab)
+      printf 'supported\n'
+      printf 'compare url: %s\n' "$(compare_url "$base" "$branch")"
+      ;;
+    *)
+      printf 'fallback only\n'
+      ;;
+  esac
+
+  if [ -n "$upstream" ]; then
+    counts="$(branch_ahead_behind "$branch" || true)"
+    parsed_counts="$(parse_ahead_behind "$counts")"
+    ahead="${parsed_counts%% *}"
+    behind="${parsed_counts##* }"
+    printf 'upstream:   %s\n' "$upstream"
+    printf 'ahead/behind: %s / %s\n' "${ahead:-0}" "${behind:-0}"
+  else
+    printf 'upstream:   none\n'
+    printf 'ahead/behind: n/a\n'
+  fi
 }
 
 cmd_remote_open() {
@@ -2529,6 +2569,7 @@ main() {
     release-check) cmd_release_check ;;
     release-init) cmd_release_init "$@" ;;
     remote-info) cmd_remote_info "$@" ;;
+    remote-status) cmd_remote_status "$@" ;;
     remote-open) cmd_remote_open "$@" ;;
     remote-compare) cmd_remote_compare "$@" ;;
     config) cmd_config "$@" ;;
