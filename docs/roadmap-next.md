@@ -1,201 +1,181 @@
 # roadmap-next
 
-This roadmap tracks the next round of practical improvements after `v0.2.0`.
+This document tracks the practical short-term queue after `v0.5.1`.
 
-The project direction is now clearer:
-
-- keep the main workflow platform-agnostic
-- optimize for real daily usage
-- prefer complete workflow actions over more tiny aliases
+The long-term portfolio view lives in [roadmap-portfolio.md](roadmap-portfolio.md).
 
 ## Done
 
-### 1. Feature resume flow
-
-Goal:
-
-- make it explicit how to resume the current or most relevant feature
-
-Possible additions:
-
-- `git feature resume`
-- choose by branch or worktree
-- optionally jump path, open lazygit, or open cockpit
-
-Why:
-
-- users should not need to remember whether to use `gwt`, `git wt path`, or the menu
-
-### 2. Feature pause / handoff summary
-
-Goal:
-
-- make it easy to stop work cleanly and come back later
-
-Possible additions:
-
-- `git feature pause`
-- show branch, dirty state, recent commits, and next-step note template
-
-Why:
-
-- context loss is a real productivity tax
-
-### 3. Review workflow
-
-Goal:
-
-- create one focused review entrypoint before pushing or opening a PR/MR
-
-Possible additions:
-
-- `git review`
-- `git review diff`
-- `git review status`
-
-Why:
-
-- review quality matters more than alias count
-
-### 4. Repo/workspace overview
-
-Goal:
-
-- scale from one repo to several active repos
+### Daily flow
 
 Delivered:
 
-- `bga workspace list`
-- `bga workspace dash`
-- `bga workspace sync`
-- `workspace_root` config override
+- `feature resume`
+- `feature pause`
+- `review`
+- `feature submit`
+- `feature cleanup`
+- `start-day`
+- `finish-day`
 
 Why it mattered:
 
-- many engineers juggle multiple repos during the same day
+- the project became a workflow toolkit instead of a loose alias bundle
 
-### 5. Config layer
-
-Goal:
-
-- make behavior easier to tune without editing scripts
+### Worktree and workspace
 
 Delivered:
 
-- default base branch override
-- preferred remote override
-- preferred cockpit layout
-- workspace root override
+- `workspace list`
+- `workspace dash`
+- `workspace sync`
+- `workspace menu`
+- tmux cockpit layouts
+- stale worktree cleanup helpers
 
 Why it mattered:
 
-- current defaults are good, but teams eventually want their own conventions
+- parallel feature work and multi-repo work both became first-class
 
-### 6. Team conventions
-
-Goal:
-
-- let a repo or team share a few workflow defaults without everyone hand-tuning local config
+### Config and team defaults
 
 Delivered:
 
+- `config-bga`
 - repo-level `.bga.env`
-- default base branch
-- preferred remote
-- preferred cockpit layout
+- protected branch config
 - workspace root override
-- local user override still wins
 
 Why it mattered:
 
-- local config is useful, but team conventions should not depend on tribal knowledge
+- local flexibility and shared conventions now coexist cleanly
 
-## Next
-
-### 7. Workspace action menu
-
-Goal:
-
-- make multi-repo work feel as guided as the single-repo menu
+### Release ergonomics
 
 Delivered:
 
-- `bga workspace menu`
-- pick repo then action
-- dashboard, sync, lazygit, cockpit, codex, cline, and path actions
+- `release-check`
+- `release-init`
+- consistent release note flow
 
 Why it mattered:
 
-- once users manage several repos, discoverability matters again
+- frequent releases are now low-friction
 
-## Next
-
-### 8. Protected branch config
-
-Goal:
-
-- let teams define which local branches should never be touched by cleanup helpers
+### Host-aware remote actions
 
 Delivered:
 
-- repo-level protected branch list in `.bga.env`
-- user override support
-- `prune-merged` and cleanup commands honoring that list
+- `remote-info`
+- `remote-open`
+- `remote-status`
+- `remote-compare`
+- remote actions in `git menu`
+- provider capability documentation
 
 Why it mattered:
 
-- branch cleanup should be opinionated, but not hard-coded to only a few branch names
+- the project gained useful hosting awareness without making it central
 
-## Next
+## Now
 
-### 9. Demo polish
+### 1. Workspace intelligence
 
 Goal:
 
-- improve adoption from the repo homepage and docs
+- make workspace views prioritize what actually needs attention
 
-Delivered:
+Candidates:
 
-- demo workspace setup script
-- richer workspace and team-config examples
+- workspace attention summary
+- dirty-first sorting
+- no-upstream and ahead/behind prioritization
+- recent repo entrypoint
 
-Why it mattered:
+Why:
 
-- the workflow is now deeper, so showing it matters more
+- the current workspace tools are useful, but still mostly descriptive
 
-## Next
-
-### 10. Release ergonomics
+### 2. Team config validation
 
 Goal:
 
-- reduce the manual work required to cut the next release
+- help teams verify that repo defaults and local overrides are coherent
 
-Delivered:
+Candidates:
 
-- version consistency checks
-- `release-check` command
-- release note presence check
-- `release-init` scaffolding command
+- `config-bga validate`
+- branch naming policy checks
+- protected branch config validation
 
-Why it mattered:
+Why:
 
-- releases are frequent enough now that the process should be tighter
+- team config becomes more valuable once it can be validated
+
+## Next
+
+### 3. Safer cleanup reports
+
+Goal:
+
+- make destructive operations more explainable
+
+Candidates:
+
+- richer dry-run output
+- explicit cleanup reasons
+- optional machine-readable output
+
+Why:
+
+- trust matters most when commands delete things
+
+### 4. Remote review polish
+
+Goal:
+
+- improve remote-aware review context while keeping provider actions optional
+
+Candidates:
+
+- provider capability hints in `remote-status`
+- clearer compare fallback guidance
+- more self-hosted pattern coverage
+
+Why:
+
+- the base layer exists; now it needs polish
 
 ## Later
 
-### 11. Provider abstraction
+### 5. Documentation and adoption assets
 
 Goal:
 
-- support forge-specific helpers beyond GitHub without polluting the main workflow
+- make the project easier to evaluate quickly
 
-Possible additions:
+Candidates:
 
-- optional provider modules
-- Azure DevOps / GitLab / Gitea support
-- remote detection primitives
+- screenshots
+- gifs
+- deeper onboarding examples
 
 Why:
 
-- useful, but not required for the main Git-native workflow
+- presentation matters more now that the feature surface is broader
+
+### 6. Optional provider modules
+
+Goal:
+
+- support deeper provider-specific flows without touching the core workflow
+
+Candidates:
+
+- Azure DevOps compare improvements
+- GitLab/Gitea refinements
+- optional PR/MR URL helpers
+
+Why:
+
+- useful for some users, but still not the core of the project
