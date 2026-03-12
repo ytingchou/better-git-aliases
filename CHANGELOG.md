@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.5.0] - 2026-03-13
+
+### Added
+
+- `remote-open` command and alias for opening the current remote's web URL
+- `remote-compare` command and alias for generating compare URLs on supported providers
+- `docs/roadmap-v0.5.0.md` for the next host-aware project direction
+
+### Changed
+
+- The toolkit now has a clearer provider-aware but host-agnostic direction
+- Remote parsing utilities now power higher-level remote actions, with safe fallback for unsupported compare URLs
+
 ## [0.4.2] - 2026-03-13
 
 ### Added
