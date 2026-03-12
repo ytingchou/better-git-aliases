@@ -1228,7 +1228,7 @@ remote_menu_preview() {
   case "$1" in
     "Show remote status")
       cat <<'EOF'
-Show the current branch, base branch, provider, upstream state, and compare readiness.
+Show the current branch, base branch, provider, upstream state, compare readiness, and the recommended next step.
 EOF
       ;;
     "Open remote repo")
@@ -1258,7 +1258,7 @@ EOF
 }
 
 cmd_remote_status() {
-  local base="${1:-$(default_base_branch)}" branch parsed provider web_url upstream counts parsed_counts ahead behind
+  local base="${1:-$(default_base_branch)}" branch parsed provider web_url upstream counts parsed_counts ahead behind next_cmd next_reason
   ensure_repo
   branch="$(current_branch)"
   [ -n "$branch" ] || die "detached HEAD; checkout a branch first"
@@ -1290,9 +1290,39 @@ cmd_remote_status() {
     printf 'upstream:   %s\n' "$upstream"
     printf 'ahead/behind: %s / %s\n' "${ahead:-0}" "${behind:-0}"
   else
+    ahead=0
+    behind=0
     printf 'upstream:   none\n'
     printf 'ahead/behind: n/a\n'
   fi
+
+  case "$provider" in
+    github|gitlab)
+      if [ -z "$upstream" ]; then
+        next_cmd='git feature submit'
+        next_reason='publish the current branch first'
+      elif [ "${behind:-0}" -gt 0 ]; then
+        next_cmd='git sync'
+        next_reason='your branch is behind its upstream'
+      else
+        next_cmd="git remote-compare ${base} ${branch}"
+        next_reason='compare support is available for this provider'
+      fi
+      ;;
+    *)
+      if [ -z "$upstream" ]; then
+        next_cmd='git feature submit'
+        next_reason='publish the current branch first'
+      else
+        next_cmd='git remote-open'
+        next_reason='compare falls back to the repo URL for this provider'
+      fi
+      ;;
+  esac
+
+  printf '\nnext:\n'
+  printf '  %s\n' "$next_cmd"
+  printf '  reason: %s\n' "$next_reason"
 }
 
 cmd_remote_open() {
