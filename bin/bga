@@ -1198,7 +1198,7 @@ EOF
 }
 
 cmd_remote_menu() {
-  local base="${1:-$(default_base_branch)}" items selected
+  local base="${1:-$(default_base_branch)}" compare="" items selected
   items=$'Show remote status\nOpen remote repo\nOpen remote compare\nShow remote info\nShow provider capabilities'
   if can_use_fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
@@ -1218,7 +1218,17 @@ cmd_remote_menu() {
   case "$selected" in
     "Show remote status") cmd_remote_status "$base" ;;
     "Open remote repo") cmd_remote_open ;;
-    "Open remote compare") cmd_remote_compare "$base" --open ;;
+    "Open remote compare")
+      if [ -t 0 ] && [ -t 1 ]; then
+        base="$(prompt_input "base branch [${base}]: ")"
+        [ -n "$base" ] || base="$(default_base_branch)"
+        compare="$(prompt_input "compare branch [$(current_branch)]: ")"
+        [ -n "$compare" ] || compare="$(current_branch)"
+        cmd_remote_compare "$base" "$compare" --open
+      else
+        cmd_remote_compare "$base" --open
+      fi
+      ;;
     "Show remote info") cmd_remote_info ;;
     "Show provider capabilities") cmd_remote_capabilities ;;
   esac
@@ -1242,6 +1252,7 @@ Open a compare URL for supported providers.
 
 Fallback behavior:
 - unsupported providers print guidance and fall back to the repo URL
+- in interactive mode, you can override the base and compare branches first
 EOF
       ;;
     "Show remote info")

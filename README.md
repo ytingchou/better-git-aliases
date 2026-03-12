@@ -309,6 +309,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git remote-compare [base] [compare]`: print a compare URL for supported providers, with safe fallback for others
 
 These remote actions are also available from `git menu` through `Remote actions`.
+In interactive mode, `remote-menu` lets you override the base and compare branches before opening a compare URL.
 - `git bootstrap [brew|apt]`: install recommended dependencies
 - `git lazygit-config install`: install the bundled lazygit config
 - `git lazygit-config path`: print the active lazygit config path
