@@ -375,6 +375,7 @@ For the next planned milestone, see [docs/roadmap-v0.2.0.md](docs/roadmap-v0.2.0
 For ongoing work after `v0.2.0`, see [docs/roadmap-next.md](docs/roadmap-next.md).
 For the next version direction, see [docs/roadmap-v0.5.0.md](docs/roadmap-v0.5.0.md).
 For the following version direction, see [docs/roadmap-v0.6.0.md](docs/roadmap-v0.6.0.md).
+For current host-aware support limits, see [docs/provider-capabilities.md](docs/provider-capabilities.md).
 
 ### 1. Learn the workflow in 30 seconds
 
