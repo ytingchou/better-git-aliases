@@ -194,6 +194,7 @@ Possible additions:
 
 - optional provider modules
 - Azure DevOps / GitLab / Gitea support
+- remote detection primitives
 
 Why:
 

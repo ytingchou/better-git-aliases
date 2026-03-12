@@ -301,6 +301,7 @@ The key helper is `gwt`, which changes the current shell into a selected worktre
 - `git doctor`: check whether required/recommended tools are installed
 - `git release-check`: verify release version consistency and required release files
 - `git release-init <version>`: scaffold a new release note file from commits since the latest version tag
+- `git remote-info [remote]`: inspect the current remote as GitHub, GitLab, Azure DevOps, or generic host info
 - `git bootstrap [brew|apt]`: install recommended dependencies
 - `git lazygit-config install`: install the bundled lazygit config
 - `git lazygit-config path`: print the active lazygit config path

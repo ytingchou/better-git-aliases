@@ -594,28 +594,91 @@ open_url() {
   fi
 }
 
-github_https_remote_url() {
-  local remote="${1:-$(config_get remote || printf 'origin')}" url host path
-  url="$(git remote get-url "$remote" 2>/dev/null || true)"
-  [ -n "$url" ] || die "git remote '$remote' not found"
+remote_url() {
+  local remote="${1:-$(config_get remote || printf 'origin')}"
+  git remote get-url "$remote" 2>/dev/null || die "git remote '$remote' not found"
+}
+
+provider_from_remote_host() {
+  local host="$1"
+  case "$host" in
+    github.com) printf 'github\n' ;;
+    gitlab.com) printf 'gitlab\n' ;;
+    dev.azure.com|ssh.dev.azure.com|*.visualstudio.com|vs-ssh.visualstudio.com) printf 'azure-devops\n' ;;
+    *) printf 'generic\n' ;;
+  esac
+}
+
+remote_info_fields() {
+  local remote="${1:-$(config_get remote || printf 'origin')}" url host path provider web_url
+  url="$(remote_url "$remote")"
   case "$url" in
-    git@github.com:*)
-      path="${url#git@github.com:}"
-      path="${path%.git}"
-      printf 'https://github.com/%s\n' "$path"
+    git@*:* )
+      host="${url#git@}"
+      host="${host%%:*}"
+      path="${url#*:}"
       ;;
-    https://github.com/*)
-      printf '%s\n' "${url%.git}"
+    ssh://git@*/*)
+      host="${url#ssh://git@}"
+      host="${host%%/*}"
+      path="${url#ssh://git@${host}/}"
       ;;
-    ssh://git@github.com/*)
-      path="${url#ssh://git@github.com/}"
-      path="${path%.git}"
-      printf 'https://github.com/%s\n' "$path"
+    https://*/*)
+      host="${url#https://}"
+      host="${host%%/*}"
+      path="${url#https://${host}/}"
+      ;;
+    http://*/*)
+      host="${url#http://}"
+      host="${host%%/*}"
+      path="${url#http://${host}/}"
       ;;
     *)
-      die "remote '$remote' is not a supported GitHub URL: $url"
+      die "unsupported remote URL format: $url"
       ;;
   esac
+
+  path="${path%.git}"
+  provider="$(provider_from_remote_host "$host")"
+  case "$provider" in
+    github|gitlab)
+      web_url="https://${host}/${path}"
+      ;;
+    azure-devops)
+      case "$host" in
+        dev.azure.com)
+          web_url="https://${host}/${path}"
+          ;;
+        ssh.dev.azure.com)
+          path="${path#v3/}"
+          web_url="https://dev.azure.com/${path%%/*}/${path#*/}"
+          web_url="${web_url%/*}/_git/${web_url##*/}"
+          ;;
+        vs-ssh.visualstudio.com)
+          path="${path#v3/}"
+          web_url="https://${path%%/*}.visualstudio.com/${path#*/}"
+          web_url="${web_url%/*}/_git/${web_url##*/}"
+          ;;
+        *.visualstudio.com)
+          web_url="https://${host}/${path}"
+          ;;
+      esac
+      ;;
+    *)
+      web_url="https://${host}/${path}"
+      ;;
+  esac
+
+  printf '%s|%s|%s|%s|%s|%s\n' "$remote" "$provider" "$host" "$path" "$web_url" "$url"
+}
+
+github_https_remote_url() {
+  local remote="${1:-$(config_get remote || printf 'origin')}" parsed provider web_url
+  parsed="$(remote_info_fields "$remote")"
+  provider="$(printf '%s' "$parsed" | cut -d'|' -f2)"
+  web_url="$(printf '%s' "$parsed" | cut -d'|' -f5)"
+  [ "$provider" = "github" ] || die "remote '$remote' is not a supported GitHub URL"
+  printf '%s\n' "$web_url"
 }
 
 tmux_attach_or_switch() {
@@ -720,6 +783,7 @@ Core:
   bga doctor                    Check environment and dependencies
   bga release-check             Verify version, release files, and tag readiness
   bga release-init VERSION      Scaffold a new release note from recent commits
+  bga remote-info [REMOTE]      Show parsed host/provider info for a git remote
   bga config <get|set|list>     Manage simple better-git-aliases config
   bga bootstrap [brew|apt]      Install recommended dependencies
   bga lazygit-config <subcmd>   Manage curated lazygit config
@@ -783,6 +847,7 @@ Recommended git aliases after install:
   git doctor
   git release-check
   git release-init
+  git remote-info
   git config-bga
   git bootstrap
   git lazygit-config
@@ -996,6 +1061,24 @@ cmd_release_init() {
   else
     printf 'Based on all commits because no previous version tag was found.\n'
   fi
+}
+
+cmd_remote_info() {
+  local parsed remote provider host path web_url raw_url
+  parsed="$(remote_info_fields "${1:-$(config_get remote || printf 'origin')}")"
+  remote="$(printf '%s' "$parsed" | cut -d'|' -f1)"
+  provider="$(printf '%s' "$parsed" | cut -d'|' -f2)"
+  host="$(printf '%s' "$parsed" | cut -d'|' -f3)"
+  path="$(printf '%s' "$parsed" | cut -d'|' -f4)"
+  web_url="$(printf '%s' "$parsed" | cut -d'|' -f5)"
+  raw_url="$(printf '%s' "$parsed" | cut -d'|' -f6)"
+
+  printf 'remote:    %s\n' "$remote"
+  printf 'provider:  %s\n' "$provider"
+  printf 'host:      %s\n' "$host"
+  printf 'path:      %s\n' "$path"
+  printf 'web url:   %s\n' "$web_url"
+  printf 'git url:   %s\n' "$raw_url"
 }
 
 cmd_bootstrap() {
@@ -2370,6 +2453,7 @@ main() {
     doctor) cmd_doctor ;;
     release-check) cmd_release_check ;;
     release-init) cmd_release_init "$@" ;;
+    remote-info) cmd_remote_info "$@" ;;
     config) cmd_config "$@" ;;
     bootstrap) cmd_bootstrap "$@" ;;
     lazygit-config) cmd_lazygit_config "$@" ;;
