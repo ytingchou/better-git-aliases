@@ -672,6 +672,25 @@ remote_info_fields() {
   printf '%s|%s|%s|%s|%s|%s\n' "$remote" "$provider" "$host" "$path" "$web_url" "$url"
 }
 
+compare_url() {
+  local base="$1" compare="$2" remote="${3:-$(config_get remote || printf 'origin')}"
+  local parsed provider web_url
+  parsed="$(remote_info_fields "$remote")"
+  provider="$(printf '%s' "$parsed" | cut -d'|' -f2)"
+  web_url="$(printf '%s' "$parsed" | cut -d'|' -f5)"
+  case "$provider" in
+    github)
+      printf '%s/compare/%s...%s\n' "$web_url" "$base" "$compare"
+      ;;
+    gitlab)
+      printf '%s/-/compare/%s...%s\n' "$web_url" "$base" "$compare"
+      ;;
+    azure-devops|generic)
+      printf '%s\n' "$web_url"
+      ;;
+  esac
+}
+
 github_https_remote_url() {
   local remote="${1:-$(config_get remote || printf 'origin')}" parsed provider web_url
   parsed="$(remote_info_fields "$remote")"
@@ -785,6 +804,8 @@ Core:
   bga release-init VERSION      Scaffold a new release note from recent commits
   bga remote-info [REMOTE]      Show parsed host/provider info for a git remote
   bga remote-open [REMOTE]      Open the parsed web URL for a git remote
+  bga remote-compare [BASE] [COMPARE] [--open]
+                                Print or open a compare URL when the provider supports it
   bga config <get|set|list>     Manage simple better-git-aliases config
   bga bootstrap [brew|apt]      Install recommended dependencies
   bga lazygit-config <subcmd>   Manage curated lazygit config
@@ -850,6 +871,7 @@ Recommended git aliases after install:
   git release-init
   git remote-info
   git remote-open
+  git remote-compare
   git config-bga
   git bootstrap
   git lazygit-config
@@ -1088,6 +1110,50 @@ cmd_remote_open() {
   parsed="$(remote_info_fields "${1:-$(config_get remote || printf 'origin')}")"
   web_url="$(printf '%s' "$parsed" | cut -d'|' -f5)"
   open_url "$web_url"
+}
+
+cmd_remote_compare() {
+  local open_flag=0 base="" compare="" url parsed provider
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --open)
+        open_flag=1
+        ;;
+      *)
+        if [ -z "$base" ]; then
+          base="$1"
+        elif [ -z "$compare" ]; then
+          compare="$1"
+        else
+          die "usage: bga remote-compare [BASE] [COMPARE] [--open]"
+        fi
+        ;;
+    esac
+    shift || true
+  done
+
+  [ -n "$base" ] || base="$(default_base_branch)"
+  [ -n "$compare" ] || compare="$(current_branch)"
+  [ -n "$compare" ] || die "detached HEAD; provide COMPARE explicitly"
+
+  parsed="$(remote_info_fields "${1:-$(config_get remote || printf 'origin')}")"
+  provider="$(printf '%s' "$parsed" | cut -d'|' -f2)"
+  url="$(compare_url "$base" "$compare")"
+
+  case "$provider" in
+    github|gitlab)
+      if [ "$open_flag" -eq 1 ]; then
+        open_url "$url"
+      else
+        printf '%s\n' "$url"
+      fi
+      ;;
+    *)
+      printf 'Compare URL is not provider-specific for %s yet.\n' "$provider"
+      printf 'Open the repo URL and compare manually:\n'
+      printf '%s\n' "$url"
+      ;;
+  esac
 }
 
 cmd_bootstrap() {
@@ -2464,6 +2530,7 @@ main() {
     release-init) cmd_release_init "$@" ;;
     remote-info) cmd_remote_info "$@" ;;
     remote-open) cmd_remote_open "$@" ;;
+    remote-compare) cmd_remote_compare "$@" ;;
     config) cmd_config "$@" ;;
     bootstrap) cmd_bootstrap "$@" ;;
     lazygit-config) cmd_lazygit_config "$@" ;;
