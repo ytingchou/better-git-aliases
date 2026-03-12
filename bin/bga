@@ -841,6 +841,7 @@ Core:
   bga release-check             Verify version, release files, and tag readiness
   bga release-init VERSION      Scaffold a new release note from recent commits
   bga remote-info [REMOTE]      Show parsed host/provider info for a git remote
+  bga remote-capabilities       Show supported remote actions for the current provider
   bga remote-menu [BASE]        Open a focused remote actions menu
   bga remote-status [BASE]      Show branch, provider, and compare readiness
   bga remote-open [REMOTE]      Open the parsed web URL for a git remote
@@ -910,6 +911,7 @@ Recommended git aliases after install:
   git release-check
   git release-init
   git remote-info
+  git remote-capabilities
   git remote-menu
   git remote-status
   git remote-open
@@ -1147,9 +1149,57 @@ cmd_remote_info() {
   printf 'git url:   %s\n' "$raw_url"
 }
 
+cmd_remote_capabilities() {
+  local parsed provider doc_path
+  parsed="$(remote_info_fields "${1:-$(config_get remote || printf 'origin')}")"
+  provider="$(printf '%s' "$parsed" | cut -d'|' -f2)"
+  doc_path="${BGA_ROOT}/docs/provider-capabilities.md"
+
+  printf 'provider: %s\n\n' "$provider"
+  case "$provider" in
+    github)
+      cat <<'EOF'
+Capabilities:
+  remote-info:     yes
+  remote-open:     yes
+  remote-status:   yes
+  remote-compare:  yes
+EOF
+      ;;
+    gitlab)
+      cat <<'EOF'
+Capabilities:
+  remote-info:     yes
+  remote-open:     yes
+  remote-status:   yes
+  remote-compare:  yes
+EOF
+      ;;
+    azure-devops)
+      cat <<'EOF'
+Capabilities:
+  remote-info:     yes
+  remote-open:     yes
+  remote-status:   yes
+  remote-compare:  fallback to repo URL
+EOF
+      ;;
+    *)
+      cat <<'EOF'
+Capabilities:
+  remote-info:     yes
+  remote-open:     yes
+  remote-status:   yes
+  remote-compare:  fallback to repo URL
+EOF
+      ;;
+  esac
+  printf '\nReference:\n  %s\n' "$doc_path"
+}
+
 cmd_remote_menu() {
   local base="${1:-$(default_base_branch)}" items selected
-  items=$'Show remote status\nOpen remote repo\nOpen remote compare\nShow remote info'
+  items=$'Show remote status\nOpen remote repo\nOpen remote compare\nShow remote info\nShow provider capabilities'
   if can_use_fzf; then
     selected="$(printf '%s\n' "$items" | fzf \
       --height=40% \
@@ -1170,6 +1220,7 @@ cmd_remote_menu() {
     "Open remote repo") cmd_remote_open ;;
     "Open remote compare") cmd_remote_compare "$base" --open ;;
     "Show remote info") cmd_remote_info ;;
+    "Show provider capabilities") cmd_remote_capabilities ;;
   esac
 }
 
@@ -1196,6 +1247,11 @@ EOF
     "Show remote info")
       cat <<'EOF'
 Show provider, host, path, web URL, and raw Git URL for the current remote.
+EOF
+      ;;
+    "Show provider capabilities")
+      cat <<'EOF'
+Show the current provider's supported remote actions and fallback behavior.
 EOF
       ;;
   esac
@@ -2723,6 +2779,7 @@ main() {
     release-check) cmd_release_check ;;
     release-init) cmd_release_init "$@" ;;
     remote-info) cmd_remote_info "$@" ;;
+    remote-capabilities) cmd_remote_capabilities "$@" ;;
     remote-menu) cmd_remote_menu "$@" ;;
     remote-status) cmd_remote_status "$@" ;;
     remote-open) cmd_remote_open "$@" ;;
